@@ -32,11 +32,11 @@ import Listing from "./models/Listing.js";
 const app = express();
 
 /* ==========================
-          CORS (PRODUCTION SAFE)
+          CORS
 ========================== */
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // EXACT vercel URL (no slash)
+    origin: process.env.FRONTEND_URL, // no trailing slash
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -53,10 +53,7 @@ app.use(express.urlencoded({ extended: true }));
         HEALTH CHECK
 ========================== */
 app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    env: process.env.NODE_ENV || "production",
-  });
+  res.status(200).json({ status: "OK" });
 });
 
 /* ==========================
@@ -72,7 +69,7 @@ app.get("/api/packages", async (req, res) => {
     const list = await Package.find().sort({ createdAt: -1 });
     res.json(list);
   } catch (err) {
-    console.error("PACKAGES ERROR:", err);
+    console.error(err);
     res.status(500).json({ message: "Failed to fetch packages" });
   }
 });
@@ -88,7 +85,7 @@ app.get("/api/packages/:id", async (req, res) => {
 });
 
 /* ==========================
-      HOST ROUTES
+        HOST ROUTES
 ========================== */
 app.use("/api/host/auth", hostAuthRoutes);
 app.use("/api/host/listings", hostListingRoutes);
@@ -96,7 +93,7 @@ app.use("/api/host/bookings", hostBookingRoutes);
 app.use("/api/host/payments", hostPaymentRoutes);
 
 /* ==========================
-      PUBLIC HOST LISTINGS
+        PUBLIC LISTINGS
 ========================== */
 app.get("/api/listings", async (req, res) => {
   try {
@@ -113,7 +110,6 @@ app.get("/api/listings/:id", async (req, res) => {
       "hostId",
       "name email phoneNumber"
     );
-
     if (!listing) return res.status(404).json({ msg: "Listing not found" });
     res.json(listing);
   } catch (err) {
@@ -122,7 +118,7 @@ app.get("/api/listings/:id", async (req, res) => {
 });
 
 /* ==========================
-              ADMIN
+            ADMIN
 ========================== */
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
@@ -131,35 +127,29 @@ app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
 
 /* ==========================
-            BOOKINGS
+        BOOKINGS / PAYMENTS / INVOICE
 ========================== */
 app.use("/api/bookings", bookingRoutes);
-
-/* ==========================
-            PAYMENTS
-========================== */
 app.use("/api/payments", paymentRoutes);
-
-/* ==========================
-            INVOICES
-========================== */
 app.use("/api/invoice", invoiceRoutes);
 
 /* ==========================
-        404 HANDLER (IMPORTANT)
+        404 HANDLER
 ========================== */
 app.use((req, res) => {
-  console.log("❌ 404:", req.method, req.url);
   res.status(404).json({ error: "API route not found" });
 });
 
 /* ==========================
-        START SERVER
+        START SERVER FIRST
 ========================== */
 const PORT = process.env.PORT || 4000;
 
-connectDB();
-
 app.listen(PORT, () => {
-  console.log(`🚀 WrongTurn backend running on port ${PORT}`);
+  console.log(`🚀 Server listening on port ${PORT}`);
 });
+
+/* ==========================
+        CONNECT DB AFTER START
+========================== */
+connectDB();
