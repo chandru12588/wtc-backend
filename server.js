@@ -32,16 +32,25 @@ import Listing from "./models/Listing.js";
 const app = express();
 
 /* ==========================
-          CORS
+          ✅ CORS (FIXED)
 ========================== */
+/**
+ * IMPORTANT:
+ * - Allows all Vercel preview + production domains
+ * - Handles preflight OPTIONS correctly
+ * - Prevents "No Access-Control-Allow-Origin" error
+ */
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // no trailing slash
+    origin: true, // 👈 reflect request origin automatically
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// 🔥 REQUIRED for preflight requests
+app.options("*", cors());
 
 /* ==========================
         BODY PARSERS
@@ -144,7 +153,7 @@ app.use((req, res) => {
 });
 
 /* ==========================
-        START SERVER (SAFE)
+        START SERVER
 ========================== */
 const PORT = process.env.PORT || 4000;
 
