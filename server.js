@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 dotenv.config(); // MUST BE FIRST
 
 import express from "express";
-import cors from "cors";
 import { connectDB } from "./config/db.js";
 
 /* ==========================
@@ -32,16 +31,36 @@ import Listing from "./models/Listing.js";
 const app = express();
 
 /* ==========================
-          CORS
+        ✅ MANUAL CORS (FINAL)
 ========================== */
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL, // no trailing slash
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Allow Vercel & localhost only
+  if (
+    origin &&
+    (origin.includes("vercel.app") || origin.includes("localhost"))
+  ) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 /* ==========================
         BODY PARSERS
@@ -144,7 +163,7 @@ app.use((req, res) => {
 });
 
 /* ==========================
-        START SERVER (SAFE)
+        START SERVER
 ========================== */
 const PORT = process.env.PORT || 4000;
 
