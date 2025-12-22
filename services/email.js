@@ -1,19 +1,18 @@
 import nodemailer from "nodemailer";
 
 export const mailer = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,          // smtp-relay.brevo.com
-  port: Number(process.env.SMTP_PORT),  // 587
-  secure: false,                        // MUST be false for 587
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER,        // 9e8c66001@smtp-brevo.com
-    pass: process.env.SMTP_PASS,        // xsmtpsib-xxxxxxxx
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
   connectionTimeout: 60000,
   greetingTimeout: 60000,
   socketTimeout: 60000,
 });
 
-// ✅ Verify SMTP ONCE when server starts
 mailer.verify((error) => {
   if (error) {
     console.error("❌ BREVO SMTP ERROR:", error);
