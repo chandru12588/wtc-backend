@@ -2,8 +2,8 @@
 import express from "express";
 import multer from "multer";
 import cloudinary from "cloudinary";
-import nodemailer from "nodemailer";
 import HostBooking from "../models/HostBooking.js";
+import { mailer } from "../utils/mailer.js"; // ✅ BREVO MAILER
 
 const router = express.Router();
 
@@ -14,22 +14,6 @@ cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-/* ---------------------------------------
-   EMAIL CONFIG
------------------------------------------ */
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-transporter.verify((err) => {
-  if (err) console.error("❌ HOST EMAIL ERROR:", err);
-  else console.log("✅ HOST EMAIL READY");
 });
 
 /* ---------------------------------------
@@ -107,6 +91,7 @@ router.post("/", async (req, res) => {
       paymentMode,
       idProofUrl,
       paymentStatus: "pending",
+      bookingStatus: "pending",
     });
 
     res.json({ booking });
@@ -151,7 +136,7 @@ router.get("/user/:userId", async (req, res) => {
 });
 
 /* ---------------------------------------
-   USER CANCEL HOST BOOKING  ✅ FIXED ROUTE
+   USER CANCEL HOST BOOKING
 ----------------------------------------- */
 router.put("/:id/cancel", async (req, res) => {
   try {
@@ -179,7 +164,9 @@ router.put("/:id/cancel", async (req, res) => {
 
     await booking.save();
 
-    await transporter.sendMail({
+    /* 📧 EMAIL (BREVO) */
+    await mailer.sendMail({
+      from: process.env.EMAIL_FROM, // noreply@brevo.com
       to: booking.email,
       subject: "Host Booking Cancelled – WrongTurnClub",
       html: `

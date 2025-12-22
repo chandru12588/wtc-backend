@@ -5,8 +5,8 @@ import Booking from "../models/Booking.js";
 import HostBooking from "../models/HostBooking.js";
 import Package from "../models/Package.js";
 import { requireAdmin } from "../middleware/auth.js";
-import nodemailer from "nodemailer";
 import { generateInvoiceBuffer } from "./invoice.js";
+import { mailer } from "../utils/mailer.js"; // ✅ USE BREVO MAILER
 
 const router = express.Router();
 const upload = multer();
@@ -16,24 +16,6 @@ cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-/* ================= EMAIL ================= */
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-/* verify once at server start */
-transporter.verify((err) => {
-  if (err) {
-    console.error("❌ EMAIL CONFIG ERROR:", err);
-  } else {
-    console.log("✅ EMAIL TRANSPORTER READY");
-  }
 });
 
 /* ======================================================
@@ -103,8 +85,8 @@ router.post("/", upload.single("idProof"), async (req, res) => {
     });
 
     /* 📧 EMAIL CONFIRMATION */
-    await transporter.sendMail({
-      from: `"WrongTurnClub" <${process.env.EMAIL_USER}>`,
+    await mailer.sendMail({
+      from: process.env.EMAIL_FROM, // noreply@brevo.com
       to: email,
       subject: "Booking Received – WrongTurnClub",
       html: `
@@ -124,99 +106,6 @@ router.post("/", upload.single("idProof"), async (req, res) => {
 });
 
 /* ======================================================
-   USER — CANCEL PACKAGE BOOKING ✅ (NEW)
-====================================================== */
-router.put("/:id/cancel", async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-
-    if (!booking)
-      return res.status(404).json({ message: "Booking not found" });
-
-    if (!["pending", "accepted"].includes(booking.status)) {
-      return res
-        .status(400)
-        .json({ message: "This booking cannot be cancelled" });
-    }
-
-    if (new Date() >= new Date(booking.checkIn)) {
-      return res
-        .status(400)
-        .json({ message: "Check-in date already passed" });
-    }
-
-    booking.status = "cancelled";
-    booking.paymentStatus =
-      booking.paymentStatus === "paid"
-        ? "refund_pending"
-        : "cancelled";
-
-    await booking.save();
-
-    res.json({ message: "Booking cancelled successfully", booking });
-  } catch (err) {
-    console.error("CANCEL BOOKING ERROR:", err);
-    res.status(500).json({ message: "Cancel failed" });
-  }
-});
-
-/* ======================================================
-   ADMIN — GET ALL BOOKINGS (PACKAGE + HOST)
-====================================================== */
-router.get("/admin/all", requireAdmin, async (req, res) => {
-  try {
-    const packageBookings = await Booking.find()
-      .populate("packageId")
-      .sort({ createdAt: -1 });
-
-    const hostBookings = await HostBooking.find()
-      .populate("listingId")
-      .sort({ createdAt: -1 });
-
-    const merged = [
-      ...packageBookings.map((b) => ({
-        _id: b._id,
-        name: b.name,
-        email: b.email,
-        phone: b.phone,
-        packageId: { title: b.packageId?.title },
-        people: b.people,
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
-        amount: b.amount,
-        paymentStatus: b.paymentStatus,
-        paymentMethod: b.paymentMethod,
-        status: b.status,
-        idProofUrl: b.idProofUrl,
-        source: "package",
-      })),
-      ...hostBookings.map((b) => ({
-        _id: b._id,
-        name: b.name,
-        email: b.email,
-        phone: b.phone,
-        packageId: { title: b.listingId?.title || "Host Stay" },
-        people: b.guests,
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
-        amount: b.amount,
-        paymentStatus: b.paymentStatus,
-        paymentMethod: b.paymentMode,
-        status: b.bookingStatus || "pending",
-        idProofUrl: b.idProofUrl,
-        source: "host",
-      })),
-    ];
-
-    merged.sort((a, b) => new Date(b.checkIn || 0) - new Date(a.checkIn || 0));
-    res.json(merged);
-  } catch (err) {
-    console.error("ADMIN BOOKINGS ERROR:", err);
-    res.status(500).json({ message: "Failed to load bookings" });
-  }
-});
-
-/* ======================================================
    ADMIN — ACCEPT / REJECT PACKAGE BOOKINGS
 ====================================================== */
 router.put("/:id/status", requireAdmin, async (req, res) => {
@@ -227,23 +116,22 @@ router.put("/:id/status", requireAdmin, async (req, res) => {
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     booking.status = status;
-
-    if (status === "accepted") booking.paymentStatus = "paid";
-    if (status === "rejected") booking.paymentStatus = "failed";
-
+    booking.paymentStatus = status === "accepted" ? "paid" : "failed";
     await booking.save();
 
     if (status === "accepted") {
       const invoiceBuffer = await generateInvoiceBuffer(booking);
 
-      await transporter.sendMail({
-        from: `"WrongTurnClub" <${process.env.EMAIL_USER}>`,
+      await mailer.sendMail({
+        from: process.env.EMAIL_FROM,
         to: booking.email,
         subject: "Booking Confirmed – WrongTurnClub ✅",
         html: `
           <h3>Hello ${booking.name}</h3>
           <p>Your booking for <b>${booking.packageId.title}</b> is confirmed.</p>
-          <p><b>Check-in:</b> ${new Date(booking.checkIn).toDateString()}</p>
+          <p><b>Check-in:</b> ${new Date(
+            booking.checkIn
+          ).toDateString()}</p>
           <p><b>Amount:</b> ₹${booking.amount}</p>
           <br/>
           <b>Invoice attached.</b>

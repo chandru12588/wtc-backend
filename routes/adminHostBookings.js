@@ -1,19 +1,10 @@
 import express from "express";
 import HostBooking from "../models/HostBooking.js";
-import nodemailer from "nodemailer";
 import { requireAdmin } from "../middleware/auth.js";
 import { generateInvoiceBuffer } from "./invoice.js";
+import { mailer } from "../utils/mailer.js"; // ✅ USE BREVO MAILER
 
 const router = express.Router();
-
-/* ================= EMAIL ================= */
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 /* ======================================================
    ADMIN — GET ALL HOST BOOKINGS
@@ -32,7 +23,7 @@ router.get("/", requireAdmin, async (req, res) => {
 });
 
 /* ======================================================
-   ✅ ADMIN — ACCEPT / REJECT HOST BOOKING (FIX)
+   ✅ ADMIN — ACCEPT / REJECT HOST BOOKING (FIXED)
 ====================================================== */
 router.put("/host/:id/status", requireAdmin, async (req, res) => {
   try {
@@ -46,9 +37,7 @@ router.put("/host/:id/status", requireAdmin, async (req, res) => {
     }
 
     booking.bookingStatus = status;
-
-    if (status === "accepted") booking.paymentStatus = "paid";
-    if (status === "rejected") booking.paymentStatus = "pending";
+    booking.paymentStatus = status === "accepted" ? "paid" : "pending";
 
     await booking.save();
 
@@ -62,8 +51,8 @@ router.put("/host/:id/status", requireAdmin, async (req, res) => {
         status: booking.bookingStatus,
       });
 
-      await transporter.sendMail({
-        from: `"WrongTurnClub" <${process.env.EMAIL_USER}>`,
+      await mailer.sendMail({
+        from: process.env.EMAIL_FROM, // noreply@brevo.com
         to: booking.email,
         subject: "Host Stay Booking Confirmed – WrongTurnClub ✅",
         html: `
