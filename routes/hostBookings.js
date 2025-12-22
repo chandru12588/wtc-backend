@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 import cloudinary from "cloudinary";
 import HostBooking from "../models/HostBooking.js";
-import { mailer } from "../services/email.js"; // ✅ BREVO MAILER
+import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO HTTP API
 
 const router = express.Router();
 
@@ -164,24 +164,27 @@ router.put("/:id/cancel", async (req, res) => {
 
     await booking.save();
 
-    /* 📧 EMAIL (BREVO) */
-    await mailer.sendMail({
-      from: process.env.EMAIL_FROM, // noreply@brevo.com
-      to: booking.email,
-      subject: "Host Booking Cancelled – WrongTurnClub",
-      html: `
-        <h3>Hello ${booking.name},</h3>
-        <p>Your booking for <b>${booking.listingId?.title}</b> has been cancelled.</p>
-        <p>Check-in: ${new Date(booking.checkIn).toDateString()}</p>
-        <p>${
-          booking.paymentStatus === "refund_pending"
-            ? "Refund will be processed in 5–7 working days."
-            : "No payment was captured."
-        }</p>
-        <br/>
-        <b>– WrongTurnClub</b>
-      `,
-    });
+    /* 📧 EMAIL (NON-BLOCKING) */
+    try {
+      await sendEmail({
+        to: booking.email,
+        subject: "Host Booking Cancelled – WrongTurnClub",
+        html: `
+          <h3>Hello ${booking.name},</h3>
+          <p>Your booking for <b>${booking.listingId?.title}</b> has been cancelled.</p>
+          <p>Check-in: ${new Date(booking.checkIn).toDateString()}</p>
+          <p>${
+            booking.paymentStatus === "refund_pending"
+              ? "Refund will be processed in 5–7 working days."
+              : "No payment was captured."
+          }</p>
+          <br/>
+          <b>– WrongTurnClub</b>
+        `,
+      });
+    } catch (e) {
+      console.error("CANCEL EMAIL FAILED (ignored):", e.message);
+    }
 
     res.json({ booking });
   } catch (err) {

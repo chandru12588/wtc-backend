@@ -2,7 +2,7 @@ import express from "express";
 import HostBooking from "../models/HostBooking.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { generateInvoiceBuffer } from "./invoice.js";
-import { mailer } from "../services/email.js"; // ✅ USE BREVO MAILER
+import { sendEmail } from "../utils/sendEmail.js";
 
 const router = express.Router();
 
@@ -23,7 +23,7 @@ router.get("/", requireAdmin, async (req, res) => {
 });
 
 /* ======================================================
-   ✅ ADMIN — ACCEPT / REJECT HOST BOOKING (FIXED)
+   ADMIN — ACCEPT / REJECT HOST BOOKING (FIXED)
 ====================================================== */
 router.put("/host/:id/status", requireAdmin, async (req, res) => {
   try {
@@ -38,10 +38,9 @@ router.put("/host/:id/status", requireAdmin, async (req, res) => {
 
     booking.bookingStatus = status;
     booking.paymentStatus = status === "accepted" ? "paid" : "pending";
-
     await booking.save();
 
-    /* 📧 EMAIL + 📄 INVOICE */
+    /* 📧 EMAIL + 📄 INVOICE (NON-BLOCKING) */
     if (status === "accepted") {
       const invoiceBuffer = await generateInvoiceBuffer({
         ...booking.toObject(),
@@ -51,25 +50,33 @@ router.put("/host/:id/status", requireAdmin, async (req, res) => {
         status: booking.bookingStatus,
       });
 
-      await mailer.sendMail({
-        from: process.env.EMAIL_FROM, // noreply@brevo.com
-        to: booking.email,
-        subject: "Host Stay Booking Confirmed – WrongTurnClub ✅",
-        html: `
-          <h3>Hello ${booking.name}</h3>
-          <p>Your stay at <b>${booking.listingId?.title}</b> is confirmed.</p>
-          <p><b>Check-in:</b> ${new Date(booking.checkIn).toDateString()}</p>
-          <p><b>Amount:</b> ₹${booking.amount}</p>
-          <br/>
-          <b>Invoice attached.</b>
-        `,
-        attachments: [
-          {
-            filename: `invoice_${booking._id}.pdf`,
-            content: invoiceBuffer,
-          },
-        ],
-      });
+      try {
+        await sendEmail({
+          to: booking.email,
+          subject: "Host Stay Booking Confirmed – WrongTurnClub ✅",
+          html: `
+            <h3>Hello ${booking.name}</h3>
+            <p>Your stay at <b>${booking.listingId?.title}</b> is confirmed.</p>
+            <p><b>Check-in:</b> ${new Date(
+              booking.checkIn
+            ).toDateString()}</p>
+            <p><b>Amount:</b> ₹${booking.amount}</p>
+            <br/>
+            <b>Invoice attached.</b>
+          `,
+          attachments: [
+            {
+              filename: `invoice_${booking._id}.pdf`,
+              content: invoiceBuffer,
+            },
+          ],
+        });
+      } catch (emailErr) {
+        console.error(
+          "HOST CONFIRMATION EMAIL FAILED (ignored):",
+          emailErr.message
+        );
+      }
     }
 
     res.json({ booking });
