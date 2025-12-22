@@ -4,7 +4,7 @@ export async function sendEmail({ to, subject, html }) {
   return brevo.post("/smtp/email", {
     sender: {
       name: "WrongTurn Club",
-      email: "noreply@brevo.com",
+      email: "chandru.jerry@gmail.com", // ✅ VERIFIED IN BREVO
     },
     to: [{ email: to }],
     subject,
