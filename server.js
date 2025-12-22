@@ -7,7 +7,7 @@ import cors from "cors";
 import { connectDB } from "./config/db.js";
 
 /* ==========================
-        ROUTES
+        ROUTE IMPORTS
 ========================== */
 import adminRoutes from "./routes/admin.js";
 import adminAuthRoutes from "./routes/adminAuth.js";
@@ -25,7 +25,7 @@ import hostListingRoutes from "./routes/hostListings.js";
 import hostBookingRoutes from "./routes/hostBookings.js";
 import hostPaymentRoutes from "./routes/hostPayments.js";
 
-/* MODELS */
+/* MODELS (used in public routes) */
 import Package from "./models/Package.js";
 import Listing from "./models/Listing.js";
 
@@ -53,7 +53,10 @@ app.use(express.urlencoded({ extended: true }));
         HEALTH CHECK
 ========================== */
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "OK" });
+  res.status(200).json({
+    status: "OK",
+    message: "WrongTurn backend running 🚀",
+  });
 });
 
 /* ==========================
@@ -69,7 +72,7 @@ app.get("/api/packages", async (req, res) => {
     const list = await Package.find().sort({ createdAt: -1 });
     res.json(list);
   } catch (err) {
-    console.error(err);
+    console.error("PACKAGES ERROR:", err);
     res.status(500).json({ message: "Failed to fetch packages" });
   }
 });
@@ -141,15 +144,22 @@ app.use((req, res) => {
 });
 
 /* ==========================
-        START SERVER FIRST
+        START SERVER (SAFE)
 ========================== */
 const PORT = process.env.PORT || 4000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server listening on port ${PORT}`);
-});
+async function startServer() {
+  try {
+    await connectDB();
+    console.log("✅ MongoDB connected");
 
-/* ==========================
-        CONNECT DB AFTER START
-========================== */
-connectDB();
+    app.listen(PORT, () => {
+      console.log(`🚀 Server listening on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Server startup failed:", err);
+    process.exit(1);
+  }
+}
+
+startServer();
