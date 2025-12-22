@@ -1,8 +1,8 @@
 import nodemailer from "nodemailer";
 
 export const mailer = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,          // smtp-relay.brevo.com
-  port: Number(process.env.SMTP_PORT),  // 587
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
   secure: false,
   auth: {
     user: process.env.SMTP_USER,
@@ -14,4 +14,3 @@ export const mailer = nodemailer.createTransport({
 });
 
 // ❌ REMOVE verify() COMPLETELY
-// mailer.verify(...)
