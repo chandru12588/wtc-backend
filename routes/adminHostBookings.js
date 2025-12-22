@@ -2,7 +2,7 @@ import express from "express";
 import HostBooking from "../models/HostBooking.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { generateInvoiceBuffer } from "./invoice.js";
-import { mailer } from "../utils/mailer.js"; // ✅ USE BREVO MAILER
+import { mailer } from "../services/email.js"; // ✅ USE BREVO MAILER
 
 const router = express.Router();
 

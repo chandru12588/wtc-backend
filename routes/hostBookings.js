@@ -3,7 +3,7 @@ import express from "express";
 import multer from "multer";
 import cloudinary from "cloudinary";
 import HostBooking from "../models/HostBooking.js";
-import { mailer } from "../utils/mailer.js"; // ✅ BREVO MAILER
+import { mailer } from "../services/email.js"; // ✅ BREVO MAILER
 
 const router = express.Router();
 
