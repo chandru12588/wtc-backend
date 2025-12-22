@@ -2,11 +2,10 @@ import express from "express";
 import multer from "multer";
 import cloudinary from "cloudinary";
 import Booking from "../models/Booking.js";
-import HostBooking from "../models/HostBooking.js";
 import Package from "../models/Package.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { generateInvoiceBuffer } from "./invoice.js";
-import { mailer } from "../services/email.js"; // ✅ USE BREVO MAILER
+import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO API
 
 const router = express.Router();
 const upload = multer();
@@ -84,19 +83,22 @@ router.post("/", upload.single("idProof"), async (req, res) => {
       status: "pending",
     });
 
-    /* 📧 EMAIL CONFIRMATION */
-    await mailer.sendMail({
-      from: process.env.EMAIL_FROM, // noreply@brevo.com
-      to: email,
-      subject: "Booking Received – WrongTurnClub",
-      html: `
-        <h3>Hello ${name},</h3>
-        <p>Your booking for <b>${pkg.title}</b> has been received.</p>
-        <p>We will confirm shortly.</p>
-        <br/>
-        <b>– WrongTurnClub</b>
-      `,
-    });
+    /* 📧 EMAIL (NON-BLOCKING) */
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Booking Received – WrongTurnClub",
+        html: `
+          <h3>Hello ${name},</h3>
+          <p>Your booking for <b>${pkg.title}</b> has been received.</p>
+          <p>We will confirm shortly.</p>
+          <br/>
+          <b>– WrongTurnClub</b>
+        `,
+      });
+    } catch (e) {
+      console.error("BOOKING EMAIL FAILED (ignored):", e.message);
+    }
 
     res.json({ booking });
   } catch (err) {
@@ -122,27 +124,30 @@ router.put("/:id/status", requireAdmin, async (req, res) => {
     if (status === "accepted") {
       const invoiceBuffer = await generateInvoiceBuffer(booking);
 
-      await mailer.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: booking.email,
-        subject: "Booking Confirmed – WrongTurnClub ✅",
-        html: `
-          <h3>Hello ${booking.name}</h3>
-          <p>Your booking for <b>${booking.packageId.title}</b> is confirmed.</p>
-          <p><b>Check-in:</b> ${new Date(
-            booking.checkIn
-          ).toDateString()}</p>
-          <p><b>Amount:</b> ₹${booking.amount}</p>
-          <br/>
-          <b>Invoice attached.</b>
-        `,
-        attachments: [
-          {
-            filename: `invoice_${booking._id}.pdf`,
-            content: invoiceBuffer,
-          },
-        ],
-      });
+      try {
+        await sendEmail({
+          to: booking.email,
+          subject: "Booking Confirmed – WrongTurnClub ✅",
+          html: `
+            <h3>Hello ${booking.name}</h3>
+            <p>Your booking for <b>${booking.packageId.title}</b> is confirmed.</p>
+            <p><b>Check-in:</b> ${new Date(
+              booking.checkIn
+            ).toDateString()}</p>
+            <p><b>Amount:</b> ₹${booking.amount}</p>
+            <br/>
+            <b>Invoice attached.</b>
+          `,
+          attachments: [
+            {
+              filename: `invoice_${booking._id}.pdf`,
+              content: invoiceBuffer,
+            },
+          ],
+        });
+      } catch (e) {
+        console.error("CONFIRMATION EMAIL FAILED:", e.message);
+      }
     }
 
     res.json({ booking });
