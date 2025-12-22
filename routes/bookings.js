@@ -34,6 +34,22 @@ router.get("/user/:userId", async (req, res) => {
 });
 
 /* ======================================================
+   ADMIN — GET ALL PACKAGE BOOKINGS  ✅ FIX
+====================================================== */
+router.get("/admin/all", requireAdmin, async (req, res) => {
+  try {
+    const list = await Booking.find()
+      .populate("packageId")
+      .sort({ createdAt: -1 });
+
+    res.json(list);
+  } catch (err) {
+    console.error("ADMIN BOOKINGS ERROR:", err);
+    res.status(500).json({ message: "Failed to load bookings" });
+  }
+});
+
+/* ======================================================
    CREATE PACKAGE BOOKING
 ====================================================== */
 router.post("/", upload.single("idProof"), async (req, res) => {
@@ -104,6 +120,63 @@ router.post("/", upload.single("idProof"), async (req, res) => {
   } catch (err) {
     console.error("BOOKING CREATE ERROR:", err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ======================================================
+   USER / ADMIN — CANCEL PACKAGE BOOKING  ✅ FIX
+====================================================== */
+router.put("/:id/cancel", async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).populate("packageId");
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (new Date() >= new Date(booking.checkIn)) {
+      return res
+        .status(400)
+        .json({ message: "Cannot cancel after check-in date" });
+    }
+
+    booking.status = "cancelled";
+    booking.cancelledAt = new Date();
+    booking.cancelledBy = "user";
+
+    booking.paymentStatus =
+      booking.paymentStatus === "paid"
+        ? "refund_pending"
+        : "cancelled";
+
+    await booking.save();
+
+    /* 📧 EMAIL (NON-BLOCKING) */
+    try {
+      await sendEmail({
+        to: booking.email,
+        subject: "Booking Cancelled – WrongTurnClub",
+        html: `
+          <h3>Hello ${booking.name},</h3>
+          <p>Your booking for <b>${booking.packageId?.title}</b> has been cancelled.</p>
+          <p>Check-in: ${new Date(booking.checkIn).toDateString()}</p>
+          <p>${
+            booking.paymentStatus === "refund_pending"
+              ? "Refund will be processed in 5–7 working days."
+              : "No payment was captured."
+          }</p>
+          <br/>
+          <b>– WrongTurnClub</b>
+        `,
+      });
+    } catch (e) {
+      console.error("CANCEL EMAIL FAILED (ignored):", e.message);
+    }
+
+    res.json({ booking });
+  } catch (err) {
+    console.error("PACKAGE CANCEL ERROR:", err);
+    res.status(500).json({ message: "Cancel failed" });
   }
 });
 
