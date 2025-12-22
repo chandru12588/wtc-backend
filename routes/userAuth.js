@@ -50,7 +50,7 @@ router.post("/send-otp", async (req, res) => {
     await brevo.post("/smtp/email", {
       sender: {
         name: "WrongTurn Club",
-        email: "noreply@wrongturnclub.in",
+        email: "noreply@brevo.com",
       },
       to: [{ email }],
       subject: "Your WrongTurn Login OTP",
