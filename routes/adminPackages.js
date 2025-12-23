@@ -13,7 +13,7 @@ const router = express.Router();
 const upload = multer();
 
 /* -----------------------------
-   GET ALL PACKAGES
+   GET ALL PACKAGES (ADMIN + HOST)
 ------------------------------ */
 router.get("/", async (req, res) => {
   try {
@@ -30,6 +30,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ msg: "Package not found" });
     res.json(pkg);
   } catch {
     res.status(500).json({ msg: "Invalid package ID" });
@@ -37,18 +38,33 @@ router.get("/:id", async (req, res) => {
 });
 
 /* -----------------------------
-   CREATE NEW PACKAGE
+   CREATE NEW PACKAGE (ADMIN)
 ------------------------------ */
 router.post("/", upload.array("images", 10), async (req, res) => {
   try {
+    // 🔴 REQUIRED FIELD CHECK
+    if (!req.body.startDate) {
+      return res.status(400).json({ msg: "startDate is required" });
+    }
+
     const data = {
       title: req.body.title,
       description: req.body.description,
-      price: req.body.price,
-      location: req.body.location,     // ⭐ FIXED – REQUIRED FIELD
+      price: Number(req.body.price),
+
+      // 📍 LOCATION
+      location: req.body.location,
       region: req.body.region,
+
       category: req.body.category,
       days: req.body.days,
+
+      // 🗓️ DATES (CRITICAL)
+      startDate: new Date(req.body.startDate),
+      endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+
+      // admin package
+      isHostListing: false,
     };
 
     let images = [];
@@ -66,12 +82,16 @@ router.post("/", upload.array("images", 10), async (req, res) => {
 
     const slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
-    const pkg = await Package.create({ ...data, slug, images });
+    const pkg = await Package.create({
+      ...data,
+      images,
+      slug,
+    });
 
     res.json(pkg);
   } catch (err) {
-    console.log("CREATE PACKAGE ERROR:", err);
-    res.status(500).json({ msg: "Create failed" });
+    console.error("CREATE PACKAGE ERROR:", err);
+    res.status(500).json({ msg: err.message || "Create failed" });
   }
 });
 
@@ -83,23 +103,34 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
     const pkg = await Package.findById(req.params.id);
     if (!pkg) return res.status(404).json({ msg: "Package not found" });
 
+    if (!req.body.startDate) {
+      return res.status(400).json({ msg: "startDate is required" });
+    }
+
     const data = {
       title: req.body.title,
       description: req.body.description,
-      price: req.body.price,
-      location: req.body.location,     // ⭐ FIXED – REQUIRED FIELD
+      price: Number(req.body.price),
+
+      location: req.body.location,
       region: req.body.region,
+
       category: req.body.category,
       days: req.body.days,
+
+      startDate: new Date(req.body.startDate),
+      endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
     };
 
     let images = [...pkg.images];
 
+    // remove selected images
     if (req.body.removeImages) {
       const removeList = JSON.parse(req.body.removeImages);
       images = images.filter((img) => !removeList.includes(img));
     }
 
+    // upload new images
     for (const file of req.files || []) {
       const uploadRes = await new Promise((resolve, reject) => {
         cloudinary.v2.uploader.upload_stream(
@@ -113,13 +144,13 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
 
     const slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
-    pkg.set({ ...data, slug, images });
+    pkg.set({ ...data, images, slug });
     await pkg.save();
 
     res.json(pkg);
   } catch (err) {
-    console.log("UPDATE PACKAGE ERROR:", err);
-    res.status(500).json({ msg: "Update failed" });
+    console.error("UPDATE PACKAGE ERROR:", err);
+    res.status(500).json({ msg: err.message || "Update failed" });
   }
 });
 
