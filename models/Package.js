@@ -10,7 +10,15 @@ const PackageSchema = new mongoose.Schema(
     location: { type: String, required: true },  // Ooty
     region: { type: String, required: true },    // Tamil Nadu
 
-    category: { type: String },
+    // ⭐ Main Category (used for filters/backpacker/forest etc.)
+    category: { type: String },                  
+
+    // ⭐ MULTI-TAGS SUPPORT (future filtering)
+    tags: {
+      type: [String], // e.g. ["Backpacker","Bike Traveller"]
+      default: [],
+    },
+
     days: { type: String },
 
     // 🗓️ DATES (CRITICAL FOR WEEK / MONTH FILTER)
@@ -23,7 +31,7 @@ const PackageSchema = new mongoose.Schema(
       type: Date,
     },
 
-    // 🔮 FUTURE (Optional – like Exoticamp batches)
+    // 🔮 FUTURE Feature (if you want multiple upcoming batches)
     availableDates: [
       {
         type: Date,
