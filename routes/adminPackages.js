@@ -12,21 +12,21 @@ cloudinary.v2.config({
 const router = express.Router();
 const upload = multer();
 
-/* -----------------------------
-   GET ALL PACKAGES (ADMIN + HOST)
------------------------------- */
+/* =====================================================
+   GET ALL PACKAGES
+===================================================== */
 router.get("/", async (req, res) => {
   try {
     const pkgs = await Package.find().sort({ createdAt: -1 });
     res.json(pkgs);
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: "Failed to load packages" });
   }
 });
 
-/* -----------------------------
-   GET SINGLE PACKAGE
------------------------------- */
+/* =====================================================
+   GET SINGLE
+===================================================== */
 router.get("/:id", async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
@@ -37,14 +37,13 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/* -----------------------------
-   CREATE NEW PACKAGE (ADMIN)
------------------------------- */
+/* =====================================================
+   CREATE PACKAGE  ⭐ StayType + Tags added
+===================================================== */
 router.post("/", upload.array("images", 10), async (req, res) => {
   try {
-    // 🔴 REQUIRED FIELD CHECK
-    if (!req.body.startDate) {
-      return res.status(400).json({ msg: "startDate is required" });
+    if (!req.body.startDate || !req.body.stayType || !req.body.category) {
+      return res.status(400).json({ msg: "stayType, category & startDate required" });
     }
 
     const data = {
@@ -52,23 +51,23 @@ router.post("/", upload.array("images", 10), async (req, res) => {
       description: req.body.description,
       price: Number(req.body.price),
 
-      // 📍 LOCATION
       location: req.body.location,
       region: req.body.region,
 
       category: req.body.category,
+      stayType: req.body.stayType,            // ⭐ Save Stay Type
+      tags: req.body.tags ? JSON.parse(req.body.tags) : [],  // ⭐ multi tags
+
       days: req.body.days,
 
-      // 🗓️ DATES (CRITICAL)
       startDate: new Date(req.body.startDate),
-      endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      endDate: req.body.endDate ? new Date(req.body.endDate) : null,
 
-      // admin package
       isHostListing: false,
     };
 
+    /* 🔥 Upload Images */
     let images = [];
-
     for (const file of req.files || []) {
       const uploadRes = await new Promise((resolve, reject) => {
         cloudinary.v2.uploader.upload_stream(
@@ -76,37 +75,28 @@ router.post("/", upload.array("images", 10), async (req, res) => {
           (err, result) => (err ? reject(err) : resolve(result))
         ).end(file.buffer);
       });
-
       images.push(uploadRes.secure_url);
     }
 
-    const slug = data.title.toLowerCase().replace(/\s+/g, "-");
+    data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
-    const pkg = await Package.create({
-      ...data,
-      images,
-      slug,
-    });
-
+    const pkg = await Package.create({ ...data, images });
     res.json(pkg);
+
   } catch (err) {
     console.error("CREATE PACKAGE ERROR:", err);
-    res.status(500).json({ msg: err.message || "Create failed" });
+    res.status(500).json({ msg: err.message });
   }
 });
 
-/* -----------------------------
-   UPDATE PACKAGE
------------------------------- */
+/* =====================================================
+   UPDATE PACKAGE  ⭐ StayType + Tags supported
+===================================================== */
 router.put("/:id", upload.array("images", 10), async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
     if (!pkg) return res.status(404).json({ msg: "Package not found" });
 
-    if (!req.body.startDate) {
-      return res.status(400).json({ msg: "startDate is required" });
-    }
-
     const data = {
       title: req.body.title,
       description: req.body.description,
@@ -116,21 +106,22 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
       region: req.body.region,
 
       category: req.body.category,
-      days: req.body.days,
+      stayType: req.body.stayType,                             // ⭐ stayType update
+      tags: req.body.tags ? JSON.parse(req.body.tags) : pkg.tags,
 
+      days: req.body.days,
       startDate: new Date(req.body.startDate),
-      endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      endDate: req.body.endDate ? new Date(req.body.endDate) : null,
     };
 
+    /* Maintain Old Images */
     let images = [...pkg.images];
 
-    // remove selected images
-    if (req.body.removeImages) {
-      const removeList = JSON.parse(req.body.removeImages);
-      images = images.filter((img) => !removeList.includes(img));
+    if (req.body.oldImages) {
+      images = JSON.parse(req.body.oldImages);
     }
 
-    // upload new images
+    /* Upload New */
     for (const file of req.files || []) {
       const uploadRes = await new Promise((resolve, reject) => {
         cloudinary.v2.uploader.upload_stream(
@@ -138,25 +129,25 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
           (err, result) => (err ? reject(err) : resolve(result))
         ).end(file.buffer);
       });
-
       images.push(uploadRes.secure_url);
     }
 
-    const slug = data.title.toLowerCase().replace(/\s+/g, "-");
+    data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
-    pkg.set({ ...data, images, slug });
+    pkg.set({ ...data, images });
     await pkg.save();
 
     res.json(pkg);
+
   } catch (err) {
     console.error("UPDATE PACKAGE ERROR:", err);
-    res.status(500).json({ msg: err.message || "Update failed" });
+    res.status(500).json({ msg: err.message });
   }
 });
 
-/* -----------------------------
-   DELETE PACKAGE
------------------------------- */
+/* =====================================================
+   DELETE
+===================================================== */
 router.delete("/:id", async (req, res) => {
   try {
     await Package.findByIdAndDelete(req.params.id);

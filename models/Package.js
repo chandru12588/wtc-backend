@@ -10,34 +10,31 @@ const PackageSchema = new mongoose.Schema(
     location: { type: String, required: true },  // Ooty
     region: { type: String, required: true },    // Tamil Nadu
 
-    // ⭐ Main Category (used for filters/backpacker/forest etc.)
-    category: { type: String },                  
+    // ⭐ Main Category for filtering
+    category: { type: String, required: true },
 
-    // ⭐ MULTI-TAGS SUPPORT (future filtering)
+    // ⭐ NEW – Stay Type (A-frame / Tent / Mud house / Villa...)
+    stayType: {
+      type: String,
+      required: true,       // user must select stay type
+    },
+
+    // ⭐ MULTI-TAGS SUPPORT (future filter)
     tags: {
-      type: [String], // e.g. ["Backpacker","Bike Traveller"]
+      type: [String],
       default: [],
     },
 
     days: { type: String },
 
-    // 🗓️ DATES (CRITICAL FOR WEEK / MONTH FILTER)
-    startDate: {
-      type: Date,
-      required: true,
-    },
+    // 🗓️ Trip dates
+    startDate: { type: Date, required: true },
+    endDate: { type: Date },
 
-    endDate: {
-      type: Date,
-    },
+    // 🔮 For multiple batches in future
+    availableDates: [{ type: Date }],
 
-    // 🔮 FUTURE Feature (if you want multiple upcoming batches)
-    availableDates: [
-      {
-        type: Date,
-      },
-    ],
-
+    // Images
     images: [String],
     slug: String,
 
