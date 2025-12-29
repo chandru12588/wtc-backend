@@ -1,3 +1,4 @@
+// backend/models/Listing.js
 import mongoose from "mongoose";
 
 const ListingSchema = new mongoose.Schema(
@@ -12,24 +13,25 @@ const ListingSchema = new mongoose.Schema(
 
     images: [String],
 
-    category: { type: String },
+    // ⭐ Used in UI search & categories
+    stayType: { type: String },      // <--- ADDED
+    category: { type: String },      
 
     approved: { type: Boolean, default: false },
 
-    /* ================================
-       ⭐ AVAILABILITY SYSTEM (NEW)
-    =================================*/
+    // ⭐ Week/Month filter support
+    startDate: { type: Date },       // <--- NEW
+    endDate: { type: Date },         // <--- NEW
 
-    // Basic available date range
+    /* Availability System (optional) */
     availableFrom: { type: Date },
     availableTo: { type: Date },
 
-    // Block specific days or periods (maintenance, full booking, etc.)
     blockedRanges: [
       {
         from: { type: Date },
         to: { type: Date },
-        reason: { type: String }, // optional text
+        reason: { type: String },
       }
     ],
   },
