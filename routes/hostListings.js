@@ -16,10 +16,10 @@ router.post("/", async (req, res) => {
       location,
       price,
       images,
-      stayType,       // ⭐ NEW
+      stayType,       
       category,
-      startDate,      // ⭐ NEW
-      endDate         // ⭐ NEW
+      startDate,
+      endDate
     } = req.body;
 
     if (!hostId) return res.status(400).json({ msg: "Host ID missing" });
@@ -33,12 +33,15 @@ router.post("/", async (req, res) => {
       images: images || [],
       stayType,
       category,
-      startDate,
-      endDate,
-      approved: false   // Admin approval required
+
+      // IMPORTANT FIX ⭐ save correctly matching DB schema
+      availableFrom: startDate,
+      availableTo: endDate,
+
+      approved: false
     });
 
-    res.json({ msg: "Listing submitted for approval", listing });
+    return res.json({ msg: "Listing submitted for approval", listing });
 
   } catch (err) {
     console.log("LISTING CREATE ERROR:", err);
@@ -48,14 +51,14 @@ router.post("/", async (req, res) => {
 
 
 /* ========================================================
-   GET ALL LISTINGS OF A HOST (Dashboard use)
+   GET ALL LISTINGS OF A HOST (Dashboard)
 ======================================================== */
 router.get("/my/:hostId", async (req, res) => {
   try {
     const list = await Listing.find({ hostId: req.params.hostId })
       .sort({ createdAt: -1 });
 
-    res.json(list);
+    return res.json(list);
 
   } catch (err) {
     res.status(500).json({ msg: "Failed to load listings" });
@@ -64,14 +67,12 @@ router.get("/my/:hostId", async (req, res) => {
 
 
 /* ========================================================
-   GET ALL HOST LISTINGS FOR USER HOME PAGE ⭐
+   PUBLIC GET — ALL APPROVED HOST LISTINGS
 ======================================================== */
 router.get("/all", async (req, res) => {
   try {
-    const data = await Listing.find({ approved: true })  // only approved shown
-      .sort({ createdAt: -1 });
-
-    res.json(data);
+    const data = await Listing.find({ approved: true }).sort({ createdAt: -1 });
+    return res.json(data);
 
   } catch (err) {
     console.log("ALL HOST LIST ERROR", err);
@@ -81,7 +82,7 @@ router.get("/all", async (req, res) => {
 
 
 /* ========================================================
-   GET SINGLE LISTING (View details page)
+   GET SINGLE LISTING
 ======================================================== */
 router.get("/:id", async (req, res) => {
   try {
@@ -93,7 +94,7 @@ router.get("/:id", async (req, res) => {
 
     if (!listing) return res.status(404).json({ msg: "Listing not found" });
 
-    res.json(listing);
+    return res.json(listing);
 
   } catch (err) {
     console.log("LISTING FETCH ERROR:", err);
@@ -103,17 +104,12 @@ router.get("/:id", async (req, res) => {
 
 
 /* ========================================================
-   UPDATE LISTING (Edit Feature) ⭐
+   UPDATE LISTING
 ======================================================== */
 router.put("/:id", async (req, res) => {
   try {
-    const updated = await Listing.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-
-    res.json({ msg: "Updated successfully", updated });
+    const updated = await Listing.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    return res.json({ msg: "Updated successfully", updated });
 
   } catch (err) {
     res.status(500).json({ msg: "Update failed" });
@@ -122,12 +118,12 @@ router.put("/:id", async (req, res) => {
 
 
 /* ========================================================
-   DELETE LISTING (Remove Stay) ⭐
+   DELETE LISTING
 ======================================================== */
 router.delete("/:id", async (req, res) => {
   try {
     await Listing.findByIdAndDelete(req.params.id);
-    res.json({ msg: "Listing deleted" });
+    return res.json({ msg: "Listing deleted" });
 
   } catch (err) {
     res.status(500).json({ msg: "Delete failed" });
