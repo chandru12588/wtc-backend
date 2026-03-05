@@ -1,6 +1,8 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import HostBooking from "../models/HostBooking.js";
+import User from "../models/User.js";
+import Admin from "../models/Admin.js";
 
 const router = express.Router();
 
@@ -156,6 +158,93 @@ router.get("/bookings", async (req, res) => {
   } catch (err) {
     console.log("ADMIN BOOKINGS ERROR:", err);
     res.status(500).json({ message: "Failed to load bookings" });
+  }
+});
+
+/* =====================================================
+   USER MANAGEMENT (Admin viewing users)
+===================================================== */
+router.get("/users", async (req, res) => {
+  try {
+    const users = await User.find().select("_id name email phone createdAt");
+    res.json(users);
+  } catch (err) {
+    console.error("❌ GET USERS ERROR:", err);
+    res.status(500).json({ message: "Failed to load users" });
+  }
+});
+
+/* =====================================================
+   GET USER DETAILS (Including password hash for viewing)
+===================================================== */
+router.get("/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("_id name email phone password createdAt");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(user);
+  } catch (err) {
+    console.error("❌ GET USER ERROR:", err);
+    res.status(500).json({ message: "Failed to load user" });
+  }
+});
+
+/* =====================================================
+   CHANGE USER PASSWORD (Admin Only)
+===================================================== */
+router.post("/users/:id/change-password", async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword) {
+      return res.status(400).json({ message: "New password required" });
+    }
+
+    const bcrypt = (await import('bcryptjs')).default;
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { password: hashedPassword },
+      { new: true }
+    ).select("_id name email");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "Password changed successfully", user });
+  } catch (err) {
+    console.error("❌ CHANGE PASSWORD ERROR:", err);
+    res.status(500).json({ message: "Failed to change password" });
+  }
+});
+
+/* =====================================================
+   UPDATE ADMIN PROFILE
+===================================================== */
+router.post("/profile/update", async (req, res) => {
+  try {
+    const { adminId, username, email } = req.body;
+
+    if (!adminId) {
+      return res.status(400).json({ message: "Admin ID required" });
+    }
+
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email) updateData.email = email;
+
+    const admin = await Admin.findByIdAndUpdate(adminId, updateData, { new: true }).select("-password");
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    res.json({ message: "Admin profile updated successfully", admin });
+  } catch (err) {
+    console.error("❌ UPDATE ADMIN PROFILE ERROR:", err);
+    res.status(500).json({ message: "Failed to update admin profile" });
   }
 });
 
