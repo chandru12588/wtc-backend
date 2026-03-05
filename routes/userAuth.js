@@ -47,19 +47,26 @@ router.post("/send-otp", async (req, res) => {
     await user.save();
 
     // ✅ SEND EMAIL USING BREVO HTTP API (AXIOS)
-    await brevo.post("/smtp/email", {
-      sender: {
-        name: "WrongTurn Club",
-        email: "chandru.jerry@gmail.com",
-      },
-      to: [{ email }],
-      subject: "Your WrongTurn Login OTP",
-      htmlContent: `
-        <h2>Your OTP Code</h2>
-        <p style="font-size:22px;font-weight:bold;">${otp}</p>
-        <p>Use this OTP to login. It expires in 10 minutes.</p>
-      `,
-    });
+    try {
+      const emailResponse = await brevo.post("/smtp/email", {
+        sender: {
+          name: "WrongTurn Club",
+          email: "chandru.jerry@gmail.com",
+        },
+        to: [{ email }],
+        subject: "Your WrongTurn Login OTP",
+        htmlContent: `
+          <h2>Your OTP Code</h2>
+          <p style="font-size:22px;font-weight:bold;">${otp}</p>
+          <p>Use this OTP to login. It expires in 10 minutes.</p>
+        `,
+      });
+      console.log("📨 OTP email sent successfully:", emailResponse.status);
+    } catch (emailError) {
+      console.error("❌ BREVO EMAIL ERROR:", emailError?.response?.data || emailError.message);
+      // Don't fail the request if email fails, just log it
+      console.log("⚠️  OTP generated but email failed to send. OTP:", otp);
+    }
 
     console.log("📨 OTP sent to:", email);
 
