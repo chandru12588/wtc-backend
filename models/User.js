@@ -24,9 +24,6 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      required: function() {
-        return !this.otpCode; // Password required if not using OTP
-      },
     },
 
     // OTP fields
@@ -61,6 +58,9 @@ userSchema.pre('save', async function(next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
+  if (!this.password) {
+    return false; // User doesn't have a password set
+  }
   const bcrypt = await import('bcryptjs');
   return bcrypt.compare(candidatePassword, this.password);
 };

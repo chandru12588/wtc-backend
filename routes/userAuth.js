@@ -193,6 +193,13 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    // Check if user has a password set
+    if (!user.password) {
+      return res.status(400).json({
+        message: "This account was created with OTP login. Please use OTP to login or reset your password."
+      });
+    }
+
     // Check password
     const isValidPassword = await user.comparePassword(password);
     if (!isValidPassword) {
