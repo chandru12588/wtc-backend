@@ -47,20 +47,27 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before saving
-userSchema.pre('save', function(next) {
-  if (this.isModified('password') && this.password) {
-    import('bcryptjs').then(bcrypt => {
-      bcrypt.hash(this.password, 12, (err, hash) => {
-        if (err) return next(err);
-        this.password = hash;
-        next();
-      });
-    }).catch(err => next(err));
-  } else {
-    next();
-  }
-});
+// Hash password before saving - DISABLED to avoid conflicts with OTP
+// userSchema.pre('save', function(next) {
+//   // Only run if password is being modified and is a non-empty string
+//   if (this.isModified('password') && typeof this.password === 'string' && this.password.trim().length > 0) {
+//     import('bcryptjs').then(bcrypt => {
+//       bcrypt.hash(this.password, 12, (err, hash) => {
+//         if (err) {
+//           console.error('Password hashing error:', err);
+//           return next(err);
+//         }
+//         this.password = hash;
+//         next();
+//       });
+//     }).catch(err => {
+//       console.error('Bcrypt import error:', err);
+//       next(err);
+//     });
+//   } else {
+//     next();
+//   }
+// });
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {

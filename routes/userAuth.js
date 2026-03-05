@@ -166,8 +166,17 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
+    // Hash password manually
+    const bcrypt = (await import('bcryptjs')).default;
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     // Create user
-    const user = await User.create({ name, email, phone, password });
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      password: hashedPassword
+    });
 
     // Create token
     const token = createToken(user);
@@ -293,7 +302,9 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired token" });
     }
 
-    user.password = password;
+    // Hash new password manually
+    const bcrypt = (await import('bcryptjs')).default;
+    user.password = await bcrypt.hash(password, 12);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
