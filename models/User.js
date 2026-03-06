@@ -43,6 +43,15 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpires: {
       type: Date,
     },
+
+    // Social login fields
+    googleId: {
+      type: String,
+    },
+
+    avatar: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

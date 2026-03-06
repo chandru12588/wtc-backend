@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 dotenv.config(); // MUST BE FIRST
 
 import express from "express";
+import session from "express-session";
+import passport from "./config/passport.js";
 import { connectDB } from "./config/db.js";
 
 /* ==========================
@@ -16,6 +18,7 @@ import adminHostListingRoutes from "./routes/adminHostListings.js";
 
 import bookingRoutes from "./routes/bookings.js";
 import userAuthRoutes from "./routes/userAuth.js";
+import authRoutes from "./routes/auth.js";
 import paymentRoutes from "./routes/payments.js";
 import invoiceRoutes from "./routes/invoice.js";
 
@@ -69,6 +72,22 @@ app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ==========================
+        SESSION CONFIG
+========================== */
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your_session_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true in production with HTTPS
+}));
+
+/* ==========================
+        PASSPORT INIT
+========================== */
+app.use(passport.initialize());
+app.use(passport.session());
+
+/* ==========================
         HEALTH CHECK
 ========================== */
 app.get("/api/health", (req, res) => {
@@ -82,6 +101,7 @@ app.get("/api/health", (req, res) => {
         USER AUTH
 ========================== */
 app.use("/api/auth", userAuthRoutes);
+app.use("/auth", authRoutes);
 
 /* ==========================
         PUBLIC PACKAGES

@@ -1,5 +1,6 @@
 import express from "express";
 import jwt from "jsonwebtoken";
+import passport from "../config/passport.js";
 import User from "../models/User.js";
 import { brevo } from "../config/brevo.js";
 
@@ -331,6 +332,17 @@ router.post("/reset-password", async (req, res) => {
 ================================ */
 router.get("/test", (req, res) => {
   res.json({ message: "User Auth Route Working ✔️" });
+});
+
+/* ===============================
+   GOOGLE AUTH ROUTES
+================================ */
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
+  const token = createToken(req.user);
+  // Redirect to frontend with token
+  res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?token=${token}`);
 });
 
 export default router;
