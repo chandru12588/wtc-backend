@@ -107,6 +107,9 @@ app.use("/api/auth", userAuthRoutes);
 /* GOOGLE OAUTH ROUTES */
 app.use("/api/auth", authRoutes);
 
+/* ALSO SUPPORT /auth FOR GOOGLE CALLBACK */
+app.use("/auth", authRoutes);
+
 /* ==========================
         PUBLIC PACKAGES
 ========================== */
