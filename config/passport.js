@@ -8,12 +8,10 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: process.env.GOOGLE_CALLBACK_URL,
-      proxy: true // Important for Railway / reverse proxy
+      proxy: true
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-
-        // Extract user info safely
         const email = profile.emails?.[0]?.value;
         const avatar = profile.photos?.[0]?.value;
         const name = profile.displayName;
@@ -22,10 +20,21 @@ passport.use(
           return done(new Error("Google account has no email"), null);
         }
 
-        // Check if user already exists
-        let user = await User.findOne({ googleId: profile.id });
+        // 🔍 Check if user exists by email or googleId
+        let user = await User.findOne({
+          $or: [
+            { googleId: profile.id },
+            { email: email }
+          ]
+        });
 
-        // If not, create new user
+        // If user exists but googleId missing, attach it
+        if (user && !user.googleId) {
+          user.googleId = profile.id;
+          await user.save();
+        }
+
+        // If user doesn't exist, create new
         if (!user) {
           user = await User.create({
             name,
@@ -44,23 +53,5 @@ passport.use(
     }
   )
 );
-
-
-// Serialize user (not really needed when using JWT, but safe)
-passport.serializeUser((user, done) => {
-  done(null, user._id);
-});
-
-
-// Deserialize user
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (err) {
-    done(err, null);
-  }
-});
-
 
 export default passport;
