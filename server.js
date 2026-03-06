@@ -34,12 +34,11 @@ import Listing from "./models/Listing.js";
 const app = express();
 
 /* ==========================
-        ✅ MANUAL CORS (FINAL)
+        MANUAL CORS
 ========================== */
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Allow Vercel & localhost only
   if (
     origin &&
     (origin.includes("vercel.app") || origin.includes("localhost"))
@@ -57,7 +56,6 @@ app.use((req, res, next) => {
   );
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  // Handle preflight
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
   }
@@ -74,12 +72,16 @@ app.use(express.urlencoded({ extended: true }));
 /* ==========================
         SESSION CONFIG
 ========================== */
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_session_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false } // Set to true in production with HTTPS
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your_session_secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+    },
+  })
+);
 
 /* ==========================
         PASSPORT INIT
@@ -101,7 +103,9 @@ app.get("/api/health", (req, res) => {
         USER AUTH
 ========================== */
 app.use("/api/auth", userAuthRoutes);
-app.use("/auth", authRoutes);
+
+/* GOOGLE OAUTH ROUTES */
+app.use("/api/auth", authRoutes);
 
 /* ==========================
         PUBLIC PACKAGES
@@ -139,7 +143,9 @@ app.use("/api/host/payments", hostPaymentRoutes);
 ========================== */
 app.get("/api/listings", async (req, res) => {
   try {
-    const list = await Listing.find({ approved: true }).sort({ createdAt: -1 });
+    const list = await Listing.find({ approved: true }).sort({
+      createdAt: -1,
+    });
     res.json(list);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch listings" });
@@ -169,7 +175,7 @@ app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
 
 /* ==========================
-        BOOKINGS / PAYMENTS / INVOICE
+    BOOKINGS / PAYMENTS
 ========================== */
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
@@ -190,13 +196,13 @@ const PORT = process.env.PORT || 4000;
 async function startServer() {
   try {
     await connectDB();
-    console.log("✅ MongoDB connected");
+    console.log("MongoDB connected");
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server listening on port ${PORT}`);
+      console.log(`Server listening on port ${PORT}`);
     });
   } catch (err) {
-    console.error("❌ Server startup failed:", err);
+    console.error("Server startup failed:", err);
     process.exit(1);
   }
 }
