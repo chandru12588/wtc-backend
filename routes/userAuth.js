@@ -28,8 +28,8 @@ router.post("/send-otp", async (req, res) => {
 
     const { name, email, phone } = req.body;
 
-    if (!name || !email) {
-      return res.status(400).json({ message: "Name & email required" });
+    if (!email) {
+      return res.status(400).json({ message: "Email required" });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -37,10 +37,15 @@ router.post("/send-otp", async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      user = await User.create({ name, email, phone });
+      const fallbackName = (name && name.trim()) || email.split("@")[0] || "User";
+      user = await User.create({ name: fallbackName, email, phone });
     } else {
-      user.name = name;
-      user.phone = phone;
+      if (name && name.trim()) {
+        user.name = name.trim();
+      }
+      if (typeof phone !== "undefined") {
+        user.phone = phone;
+      }
     }
 
     user.otpCode = otp;
