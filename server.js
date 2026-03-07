@@ -15,6 +15,7 @@ import adminAuthRoutes from "./routes/adminAuth.js";
 import adminPackageRoutes from "./routes/adminPackages.js";
 import adminHostBookings from "./routes/adminHostBookings.js";
 import adminHostListingRoutes from "./routes/adminHostListings.js";
+import adminBikeRidersRoutes from "./routes/adminBikeRiders.js";
 
 import bookingRoutes from "./routes/bookings.js";
 import userAuthRoutes from "./routes/userAuth.js";
@@ -26,6 +27,7 @@ import hostAuthRoutes from "./routes/hostAuth.js";
 import hostListingRoutes from "./routes/hostListings.js";
 import hostBookingRoutes from "./routes/hostBookings.js";
 import hostPaymentRoutes from "./routes/hostPayments.js";
+import bikeRidersRoutes from "./routes/bikeRiders.js";
 
 /* MODELS (used in public routes) */
 import Package from "./models/Package.js";
@@ -140,6 +142,7 @@ app.use("/api/host/auth", hostAuthRoutes);
 app.use("/api/host/listings", hostListingRoutes);
 app.use("/api/host/bookings", hostBookingRoutes);
 app.use("/api/host/payments", hostPaymentRoutes);
+app.use("/api/bike-riders", bikeRidersRoutes);
 
 /* ==========================
         PUBLIC LISTINGS
@@ -176,6 +179,8 @@ app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
+app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
+app.use("/admin/bike-riders", adminBikeRidersRoutes);
 
 /* ==========================
     BOOKINGS / PAYMENTS

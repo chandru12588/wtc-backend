@@ -26,7 +26,7 @@ router.post("/send-otp", async (req, res) => {
       return res.status(400).json({ message: "Request body missing" });
     }
 
-    const { name, email, phone } = req.body;
+    const { name, email, phone, dob } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: "Email required" });
@@ -38,13 +38,16 @@ router.post("/send-otp", async (req, res) => {
 
     if (!user) {
       const fallbackName = (name && name.trim()) || email.split("@")[0] || "User";
-      user = await User.create({ name: fallbackName, email, phone });
+      user = await User.create({ name: fallbackName, email, phone, dob });
     } else {
       if (name && name.trim()) {
         user.name = name.trim();
       }
       if (typeof phone !== "undefined") {
         user.phone = phone;
+      }
+      if (dob) {
+        user.dob = dob;
       }
     }
 
@@ -170,7 +173,7 @@ router.get("/me", async (req, res) => {
 ================================ */
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, dob, password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: "Name, email & password required" });
@@ -191,6 +194,7 @@ router.post("/register", async (req, res) => {
       name,
       email,
       phone,
+      dob,
       password: hashedPassword
     });
 
@@ -303,19 +307,38 @@ router.post("/forgot-password", async (req, res) => {
 ================================ */
 router.post("/reset-password", async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { token, email, otp, password } = req.body;
 
-    if (!token || !password) {
-      return res.status(400).json({ message: "Token & password required" });
+    if (!password) {
+      return res.status(400).json({ message: "Password required" });
     }
 
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() }
-    });
+    let user = null;
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+    if (token) {
+      user = await User.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() }
+      });
+
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired token" });
+      }
+    } else if (email && otp) {
+      user = await User.findOne({ email });
+      if (!user || !user.otpCode) {
+        return res.status(400).json({ message: "OTP not requested" });
+      }
+      if (user.otpCode !== otp) {
+        return res.status(400).json({ message: "Invalid OTP" });
+      }
+      if (user.otpExpires < new Date()) {
+        return res.status(400).json({ message: "OTP expired" });
+      }
+      user.otpCode = undefined;
+      user.otpExpires = undefined;
+    } else {
+      return res.status(400).json({ message: "Token or email & OTP required" });
     }
 
     // Hash new password manually

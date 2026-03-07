@@ -23,7 +23,7 @@ router.get(
   passport.authenticate("google", { session: false }),
   (req, res) => {
     const token = createToken(req.user);
-    res.redirect(`https://wtc-chandru.vercel.app/login?token=${token}`);
+    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/login?token=${token}`);
   }
 );
 

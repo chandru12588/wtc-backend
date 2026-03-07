@@ -22,6 +22,10 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    dob: {
+      type: Date,
+    },
+
     password: {
       type: String,
     },
@@ -83,7 +87,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   if (!this.password) {
     return false; // User doesn't have a password set
   }
-  const bcrypt = await import('bcryptjs');
+  const bcrypt = (await import('bcryptjs')).default;
   return bcrypt.compare(candidatePassword, this.password);
 };
 
