@@ -8,10 +8,33 @@ const router = express.Router();
 // REGISTER HOST
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      whatsappNumber,
+      country,
+      state,
+      city,
+      zipcode,
+      idProofType,
+      idProof,
+      googleMapLocation,
+    } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    if (!idProofType || !idProof) {
+      return res
+        .status(400)
+        .json({ message: "ID proof type and file are required" });
+    }
 
     const exists = await Host.findOne({ email });
-    if (exists) return res.status(400).json({ msg: "Host already exists" });
+    if (exists) return res.status(400).json({ message: "Host already exists" });
 
     const hash = await bcrypt.hash(password, 10);
 
@@ -19,10 +42,20 @@ router.post("/register", async (req, res) => {
       name,
       email,
       phone,
+      whatsappNumber,
+      country,
+      state,
+      city,
+      zipcode,
+      idProofType,
+      idProof,
+      googleMapLocation,
       password: hash,
     });
 
-    res.json({ msg: "Host registered", host });
+    const token = jwt.sign({ id: host._id }, process.env.JWT_SECRET);
+
+    res.json({ msg: "Host registered", token, host });
   } catch (err) {
     res.status(500).json(err);
   }

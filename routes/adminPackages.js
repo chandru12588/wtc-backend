@@ -55,6 +55,7 @@ router.post("/", upload.array("images", 10), async (req, res) => {
       region: req.body.region,
 
       category: req.body.category,
+      serviceType: req.body.serviceType || "general",
       stayType: req.body.stayType,            // ⭐ Save Stay Type
       tags: req.body.tags ? JSON.parse(req.body.tags) : [],  // ⭐ multi tags
 
@@ -106,6 +107,7 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
       region: req.body.region,
 
       category: req.body.category,
+      serviceType: req.body.serviceType || pkg.serviceType || "general",
       stayType: req.body.stayType,                             // ⭐ stayType update
       tags: req.body.tags ? JSON.parse(req.body.tags) : pkg.tags,
 

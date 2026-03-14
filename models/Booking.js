@@ -42,6 +42,9 @@ const BookingSchema = new mongoose.Schema(
     =================================*/
     checkIn: { type: Date, required: true },
     checkOut: { type: Date, required: true },
+    serviceStartPoint: { type: String },
+    serviceDestination: { type: String },
+    serviceDays: { type: Number },
 
     /* ================================
        GUEST COUNT

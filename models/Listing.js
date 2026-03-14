@@ -8,6 +8,11 @@ const ListingSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
 
+    country: { type: String },
+    state: { type: String },
+    city: { type: String },
+    zipcode: { type: String },
+    whatsappNumber: { type: String },
     location: { type: String, required: true },
     price: { type: Number, required: true },
 
@@ -15,6 +20,7 @@ const ListingSchema = new mongoose.Schema(
 
     // ⭐ Used in UI search & categories
     stayType: { type: String },      // <--- ADDED
+    guestPlaceType: { type: String },
     category: { type: String },      
 
     approved: { type: Boolean, default: false },

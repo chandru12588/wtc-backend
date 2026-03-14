@@ -12,6 +12,11 @@ const PackageSchema = new mongoose.Schema(
 
     // ⭐ Main Category for filtering
     category: { type: String, required: true },
+    serviceType: {
+      type: String,
+      enum: ["general", "bike", "guide", "driver"],
+      default: "general",
+    },
 
     // ⭐ NEW – Stay Type (A-frame / Tent / Mud house / Villa...)
     stayType: {

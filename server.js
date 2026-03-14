@@ -28,6 +28,10 @@ import hostListingRoutes from "./routes/hostListings.js";
 import hostBookingRoutes from "./routes/hostBookings.js";
 import hostPaymentRoutes from "./routes/hostPayments.js";
 import bikeRidersRoutes from "./routes/bikeRiders.js";
+import guideRoutes from "./routes/guides.js";
+import actingDriverRoutes from "./routes/actingDrivers.js";
+import pillionRequestRoutes from "./routes/pillionRequests.js";
+import adminPillionRequestRoutes from "./routes/adminPillionRequests.js";
 
 /* MODELS (used in public routes) */
 import Package from "./models/Package.js";
@@ -143,6 +147,9 @@ app.use("/api/host/listings", hostListingRoutes);
 app.use("/api/host/bookings", hostBookingRoutes);
 app.use("/api/host/payments", hostPaymentRoutes);
 app.use("/api/bike-riders", bikeRidersRoutes);
+app.use("/api/guides", guideRoutes);
+app.use("/api/acting-drivers", actingDriverRoutes);
+app.use("/api/pillion-requests", pillionRequestRoutes);
 
 /* ==========================
         PUBLIC LISTINGS
@@ -180,6 +187,7 @@ app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
 app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
+app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
 app.use("/admin/bike-riders", adminBikeRidersRoutes);
 
 /* ==========================
