@@ -11,6 +11,10 @@ cloudinary.v2.config({
 
 const router = express.Router();
 const upload = multer();
+const packageUpload = upload.fields([
+  { name: "images", maxCount: 10 },
+  { name: "replacementImages", maxCount: 10 },
+]);
 
 router.get("/", async (_req, res) => {
   try {
@@ -74,7 +78,7 @@ const uploadImages = async (files = []) => {
   return images;
 };
 
-router.post("/", upload.array("images", 10), async (req, res) => {
+router.post("/", packageUpload, async (req, res) => {
   try {
     if (!req.body.startDate || !req.body.stayType || !req.body.category) {
       return res
@@ -83,7 +87,7 @@ router.post("/", upload.array("images", 10), async (req, res) => {
     }
 
     const data = parsePackagePayload(req.body);
-    const images = await uploadImages(req.files || []);
+    const images = await uploadImages(req.files?.images || []);
 
     data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
@@ -95,7 +99,7 @@ router.post("/", upload.array("images", 10), async (req, res) => {
   }
 });
 
-router.put("/:id", upload.array("images", 10), async (req, res) => {
+router.put("/:id", packageUpload, async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
     if (!pkg) return res.status(404).json({ msg: "Package not found" });
@@ -107,7 +111,24 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
       images = JSON.parse(req.body.oldImages);
     }
 
-    const newImages = await uploadImages(req.files || []);
+    const replacementTargets = req.body.replacementTargets
+      ? JSON.parse(req.body.replacementTargets)
+      : [];
+    const replacementFiles = req.files?.replacementImages || [];
+
+    if (replacementTargets.length && replacementTargets.length !== replacementFiles.length) {
+      return res.status(400).json({ msg: "Replacement image data is invalid" });
+    }
+
+    if (replacementTargets.length) {
+      const uploadedReplacements = await uploadImages(replacementFiles);
+      images = images.map((imageUrl) => {
+        const replacementIndex = replacementTargets.indexOf(imageUrl);
+        return replacementIndex >= 0 ? uploadedReplacements[replacementIndex] : imageUrl;
+      });
+    }
+
+    const newImages = await uploadImages(req.files?.images || []);
     images.push(...newImages);
 
     data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
