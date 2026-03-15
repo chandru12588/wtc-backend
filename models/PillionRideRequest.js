@@ -24,6 +24,11 @@ const PillionRideRequestSchema = new mongoose.Schema(
     startPoint: { type: String, required: true, trim: true },
     destination: { type: String, required: true, trim: true },
     bikeBrand: { type: String, required: true, trim: true },
+    age: { type: Number, min: 18 },
+    idProofType: { type: String, trim: true, default: "" },
+    idProofUrl: { type: String, trim: true, default: "" },
+    customerPhotoUrl: { type: String, trim: true, default: "" },
+    policyAccepted: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

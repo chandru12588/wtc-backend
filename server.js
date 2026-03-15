@@ -16,6 +16,7 @@ import adminPackageRoutes from "./routes/adminPackages.js";
 import adminHostBookings from "./routes/adminHostBookings.js";
 import adminHostListingRoutes from "./routes/adminHostListings.js";
 import adminBikeRidersRoutes from "./routes/adminBikeRiders.js";
+import adminGuideRoutes from "./routes/adminGuides.js";
 
 import bookingRoutes from "./routes/bookings.js";
 import userAuthRoutes from "./routes/userAuth.js";
@@ -187,6 +188,7 @@ app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
 app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
+app.use("/api/admin/guides", adminGuideRoutes);
 app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
 app.use("/admin/bike-riders", adminBikeRidersRoutes);
 

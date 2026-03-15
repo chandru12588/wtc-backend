@@ -10,6 +10,10 @@ const GuideApplicationSchema = new mongoose.Schema(
     state: { type: String, required: true, trim: true },
     city: { type: String, trim: true, default: "" },
     zipcode: { type: String, trim: true, default: "" },
+    currencyCode: { type: String, trim: true, default: "INR" },
+    currencySymbol: { type: String, trim: true, default: "Rs." },
+    privateDayCharge: { type: Number, default: 0 },
+    groupDayCharge: { type: Number, default: 0 },
     languages: { type: [String], default: [] },
     experienceYears: { type: Number, default: 0 },
     specialties: { type: [String], default: [] },
@@ -20,6 +24,9 @@ const GuideApplicationSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    adminReviewNotes: { type: String, trim: true, default: "" },
+    approvedAt: { type: Date },
+    rejectedAt: { type: Date },
   },
   { timestamps: true }
 );

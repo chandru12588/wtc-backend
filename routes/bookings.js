@@ -9,6 +9,32 @@ import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO API
 
 const router = express.Router();
 const upload = multer();
+const bookingUpload = upload.fields([
+  { name: "idProof", maxCount: 1 },
+  { name: "profilePhoto", maxCount: 1 },
+  { name: "vehicleImage", maxCount: 1 },
+]);
+
+const uploadToCloudinary = async (file, folder) => {
+  if (!file) return null;
+
+  const uploaded = await new Promise((resolve, reject) => {
+    cloudinary.v2.uploader
+      .upload_stream({ folder }, (err, result) =>
+        err ? reject(err) : resolve(result)
+      )
+      .end(file.buffer);
+  });
+
+  return uploaded.secure_url;
+};
+
+const notifyAdmin = async ({ subject, html }) => {
+  const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+  if (!adminEmail) return;
+
+  await sendEmail({ to: adminEmail, subject, html });
+};
 
 /* ================= CLOUDINARY ================= */
 cloudinary.v2.config({
@@ -52,7 +78,7 @@ router.get("/admin/all", requireAdmin, async (req, res) => {
 /* ======================================================
    CREATE PACKAGE BOOKING
 ====================================================== */
-router.post("/", upload.single("idProof"), async (req, res) => {
+router.post("/", bookingUpload, async (req, res) => {
   try {
     const {
       userId,
@@ -60,11 +86,29 @@ router.post("/", upload.single("idProof"), async (req, res) => {
       name,
       email,
       phone,
+      age,
       checkIn,
       checkOut,
       serviceStartPoint,
       serviceDestination,
       serviceDays,
+      serviceType,
+      whatsappNumber,
+      customerCountry,
+      serviceCountry,
+      serviceState,
+      serviceCity,
+      guideServiceMode,
+      preferredLanguage,
+      bikeBrand,
+      vehicleModel,
+      vehicleYear,
+      fuelType,
+      vehicleRcNumber,
+      tripType,
+      tripPlan,
+      policyAccepted,
+      idProofType,
       people,
       paymentMethod,
     } = req.body;
@@ -72,19 +116,26 @@ router.post("/", upload.single("idProof"), async (req, res) => {
     const pkg = await Package.findById(packageId);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
 
-    const amount = pkg.price * Number(people || 1);
+    const normalizedServiceType = serviceType || pkg.serviceType || "general";
+    const normalizedDays = Math.max(Number(serviceDays || 1), 1);
+    const normalizedPeople = Math.max(Number(people || 1), 1);
+    const amount =
+      normalizedServiceType === "guide" || normalizedServiceType === "driver"
+        ? pkg.price * normalizedDays
+        : pkg.price * normalizedPeople;
 
-    let idProofUrl = null;
-    if (req.file) {
-      const uploaded = await new Promise((resolve, reject) => {
-        cloudinary.v2.uploader
-          .upload_stream({ folder: "wrongturn/idproof" }, (err, result) =>
-            err ? reject(err) : resolve(result)
-          )
-          .end(req.file.buffer);
-      });
-      idProofUrl = uploaded.secure_url;
-    }
+    const idProofUrl = await uploadToCloudinary(
+      req.files?.idProof?.[0],
+      "wrongturn/idproof"
+    );
+    const profilePhotoUrl = await uploadToCloudinary(
+      req.files?.profilePhoto?.[0],
+      "wrongturn/customer-photos"
+    );
+    const vehicleImageUrl = await uploadToCloudinary(
+      req.files?.vehicleImage?.[0],
+      "wrongturn/vehicle-images"
+    );
 
     const booking = await Booking.create({
       userId,
@@ -92,14 +143,34 @@ router.post("/", upload.single("idProof"), async (req, res) => {
       name,
       email,
       phone,
+      age: age ? Number(age) : undefined,
       checkIn,
       checkOut,
       serviceStartPoint,
       serviceDestination,
       serviceDays: serviceDays ? Number(serviceDays) : undefined,
-      people,
+      serviceType: normalizedServiceType,
+      whatsappNumber,
+      customerCountry,
+      serviceCountry,
+      serviceState,
+      serviceCity,
+      guideServiceMode,
+      preferredLanguage,
+      bikeBrand,
+      vehicleModel,
+      vehicleYear: vehicleYear ? Number(vehicleYear) : undefined,
+      fuelType,
+      vehicleRcNumber,
+      tripType,
+      tripPlan,
+      policyAccepted: String(policyAccepted) === "true",
+      idProofType,
+      people: normalizedPeople,
       amount,
       idProofUrl,
+      profilePhotoUrl,
+      vehicleImageUrl,
       paymentMethod,
       paymentStatus: "unpaid",
       status: "pending",
@@ -112,7 +183,7 @@ router.post("/", upload.single("idProof"), async (req, res) => {
         subject: "Booking Received – WrongTurnClub",
         html: `
           <h3>Hello ${name},</h3>
-          <p>Your booking for <b>${pkg.title}</b> has been received.</p>
+          <p>Your ${normalizedServiceType === "guide" ? "guide request" : normalizedServiceType === "driver" ? "driver request" : "booking"} for <b>${pkg.title}</b> has been received.</p>
           <p>We will confirm shortly.</p>
           <br/>
           <b>– WrongTurnClub</b>
@@ -120,6 +191,21 @@ router.post("/", upload.single("idProof"), async (req, res) => {
       });
     } catch (e) {
       console.error("BOOKING EMAIL FAILED (ignored):", e.message);
+    }
+
+    try {
+      await notifyAdmin({
+        subject: `New ${normalizedServiceType} request - ${pkg.title}`,
+        html: `
+          <h3>New ${normalizedServiceType} request</h3>
+          <p><b>Package:</b> ${pkg.title}</p>
+          <p><b>Name:</b> ${name}</p>
+          <p><b>Email:</b> ${email}</p>
+          <p><b>Phone:</b> ${phone || "-"}</p>
+        `,
+      });
+    } catch (e) {
+      console.error("ADMIN BOOKING EMAIL FAILED (ignored):", e.message);
     }
 
     res.json({ booking });

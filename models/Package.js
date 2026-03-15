@@ -5,6 +5,7 @@ const PackageSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
     price: { type: Number, required: true },
+    country: { type: String, default: "" },
 
     // 📍 LOCATION
     location: { type: String, required: true },  // Ooty
@@ -29,6 +30,17 @@ const PackageSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    guideType: { type: String, default: "" },
+    guideLanguages: {
+      type: [String],
+      default: [],
+    },
+    guideServiceMode: {
+      type: String,
+      enum: ["", "private", "group"],
+      default: "",
+    },
+    maxGroupSize: { type: Number, default: 0 },
 
     days: { type: String },
 

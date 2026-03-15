@@ -3,6 +3,21 @@ import GuideApplication from "../models/GuideApplication.js";
 
 const router = express.Router();
 
+const COUNTRY_CURRENCY_MAP = {
+  India: { code: "INR", symbol: "Rs." },
+  Australia: { code: "AUD", symbol: "A$" },
+  America: { code: "USD", symbol: "$" },
+  UK: { code: "GBP", symbol: "£" },
+  Germany: { code: "EUR", symbol: "€" },
+  Italy: { code: "EUR", symbol: "€" },
+  Portugal: { code: "EUR", symbol: "€" },
+  France: { code: "EUR", symbol: "€" },
+  Spain: { code: "EUR", symbol: "€" },
+  Denmark: { code: "DKK", symbol: "kr" },
+  Switzerland: { code: "CHF", symbol: "CHF" },
+  Dubai: { code: "AED", symbol: "AED" },
+};
+
 router.post("/apply", async (req, res) => {
   try {
     const {
@@ -14,6 +29,8 @@ router.post("/apply", async (req, res) => {
       state,
       city,
       zipcode,
+      privateDayCharge,
+      groupDayCharge,
       languages,
       experienceYears,
       specialties,
@@ -26,6 +43,14 @@ router.post("/apply", async (req, res) => {
         .status(400)
         .json({ message: "Name, email, phone, WhatsApp, country and state are required" });
     }
+
+    if (!privateDayCharge || !groupDayCharge) {
+      return res.status(400).json({
+        message: "Private and group per-day charges are required",
+      });
+    }
+
+    const currency = COUNTRY_CURRENCY_MAP[country] || { code: "USD", symbol: "$" };
 
     const existing = await GuideApplication.findOne({
       email: email.toLowerCase().trim(),
@@ -47,6 +72,10 @@ router.post("/apply", async (req, res) => {
       state,
       city,
       zipcode,
+      currencyCode: currency.code,
+      currencySymbol: currency.symbol,
+      privateDayCharge: Number(privateDayCharge),
+      groupDayCharge: Number(groupDayCharge),
       languages: languages
         ? String(languages)
             .split(",")
