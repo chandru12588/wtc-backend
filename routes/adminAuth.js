@@ -5,13 +5,30 @@ import Admin from "../models/Admin.js";
 
 const router = express.Router();
 
+function requireAdmin(req, res, next) {
+  const auth = req.headers.authorization;
+
+  if (!auth?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Admin token required" });
+  }
+
+  try {
+    const token = auth.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.admin = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ message: "Invalid admin token" });
+  }
+}
+
 /* ADMIN REGISTER (first time only) */
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
     const exists = await Admin.findOne({ email });
-    if (exists) return res.status(400).json({ msg: "Admin already exists" });
+    if (exists) return res.status(400).json({ message: "Admin already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
 
@@ -22,9 +39,9 @@ router.post("/register", async (req, res) => {
       role: "admin",
     });
 
-    res.json({ msg: "Admin registered", admin });
+    res.json({ message: "Admin registered", admin });
   } catch (err) {
-    res.status(500).json({ msg: "Server error" });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -34,10 +51,10 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!admin) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: admin._id, role: admin.role },
@@ -45,9 +62,50 @@ router.post("/login", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.json({ msg: "Login successful", token });
+    res.json({
+      message: "Login successful",
+      token,
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        createdAt: admin.createdAt,
+      },
+    });
   } catch (err) {
-    res.status(500).json({ msg: "Server error" });
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/change-password", requireAdmin, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "New password must be at least 8 characters" });
+    }
+
+    const admin = await Admin.findById(req.admin.id);
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, admin.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    admin.password = await bcrypt.hash(newPassword, 10);
+    await admin.save();
+
+    res.json({ message: "Admin password updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update admin password" });
   }
 });
 
@@ -56,15 +114,15 @@ router.post("/reset", async (req, res) => {
   try {
     const email = "admin@wrongturn.com";
     const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(404).json({ msg: "Admin not found" });
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
 
     const hashed = await bcrypt.hash("WrongTurn@123", 10);
     admin.password = hashed;
     await admin.save();
 
-    res.json({ msg: "Admin password reset!" });
+    res.json({ message: "Admin password reset!" });
   } catch {
-    res.status(500).json({ msg: "Reset error" });
+    res.status(500).json({ message: "Reset error" });
   }
 });
 

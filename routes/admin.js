@@ -1,10 +1,28 @@
 import express from "express";
+import jwt from "jsonwebtoken";
 import Booking from "../models/Booking.js";
 import HostBooking from "../models/HostBooking.js";
 import User from "../models/User.js";
 import Admin from "../models/Admin.js";
 
 const router = express.Router();
+
+function requireAdmin(req, res, next) {
+  const auth = req.headers.authorization;
+
+  if (!auth?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Admin token required" });
+  }
+
+  try {
+    const token = auth.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.admin = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ message: "Invalid admin token" });
+  }
+}
 
 /* =====================================================
    ADMIN DASHBOARD STATS  (already working – kept same)
@@ -223,19 +241,19 @@ router.post("/users/:id/change-password", async (req, res) => {
 /* =====================================================
    UPDATE ADMIN PROFILE
 ===================================================== */
-router.post("/profile/update", async (req, res) => {
+router.post("/profile/update", requireAdmin, async (req, res) => {
   try {
-    const { adminId, username, email } = req.body;
+    const { name, email } = req.body;
 
-    if (!adminId) {
-      return res.status(400).json({ message: "Admin ID required" });
+    if (!name || !email) {
+      return res.status(400).json({ message: "Name and email are required" });
     }
 
-    const updateData = {};
-    if (username) updateData.username = username;
-    if (email) updateData.email = email;
-
-    const admin = await Admin.findByIdAndUpdate(adminId, updateData, { new: true }).select("-password");
+    const admin = await Admin.findByIdAndUpdate(
+      req.admin.id,
+      { name, email },
+      { new: true, runValidators: true }
+    ).select("-password");
 
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
