@@ -112,11 +112,11 @@ router.post("/change-password", requireAdmin, async (req, res) => {
 /* RESET PASSWORD (TEMP) */
 router.post("/reset", async (req, res) => {
   try {
-    const email = "admin@wrongturn.com";
+    const email = "admin@trippolama.com";
     const admin = await Admin.findOne({ email });
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
-    const hashed = await bcrypt.hash("WrongTurn@123", 10);
+    const hashed = await bcrypt.hash("Chand@12588", 10);
     admin.password = hashed;
     await admin.save();
 
