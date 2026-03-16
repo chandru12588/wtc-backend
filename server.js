@@ -1,9 +1,10 @@
 // server.js
 import dotenv from "dotenv";
-dotenv.config(); // MUST BE FIRST
+dotenv.config();
 
 import express from "express";
 import session from "express-session";
+import cors from "cors";
 import passport from "./config/passport.js";
 import { connectDB } from "./config/db.js";
 
@@ -28,57 +29,54 @@ import hostAuthRoutes from "./routes/hostAuth.js";
 import hostListingRoutes from "./routes/hostListings.js";
 import hostBookingRoutes from "./routes/hostBookings.js";
 import hostPaymentRoutes from "./routes/hostPayments.js";
+
 import bikeRidersRoutes from "./routes/bikeRiders.js";
 import guideRoutes from "./routes/guides.js";
 import actingDriverRoutes from "./routes/actingDrivers.js";
 import pillionRequestRoutes from "./routes/pillionRequests.js";
 import adminPillionRequestRoutes from "./routes/adminPillionRequests.js";
 
-/* MODELS (used in public routes) */
+/* MODELS */
 import Package from "./models/Package.js";
 import Listing from "./models/Listing.js";
 
 const app = express();
 
 /* ==========================
-        MANUAL CORS
+        CORS CONFIG
 ========================== */
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
 
-  if (
-    origin &&
-    (origin.includes("vercel.app") || origin.includes("localhost"))
-  ) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://wtc-chandru.vercel.app",
+  "https://trippolama.com",
+  "https://www.trippolama.com"
+];
 
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin) || origin.includes("vercel.app")) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS blocked"));
+      }
+    },
+    credentials: true
+  })
+);
 
 /* ==========================
         BODY PARSERS
 ========================== */
+
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ==========================
         SESSION CONFIG
 ========================== */
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your_session_secret",
@@ -93,33 +91,35 @@ app.use(
 /* ==========================
         PASSPORT INIT
 ========================== */
+
 app.use(passport.initialize());
 app.use(passport.session());
 
 /* ==========================
         HEALTH CHECK
 ========================== */
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "OK",
-    message: "WrongTurn backend running 🚀",
+    message: "Trippolama backend running 🚀",
   });
 });
 
 /* ==========================
         USER AUTH
 ========================== */
+
 app.use("/api/auth", userAuthRoutes);
 
-/* GOOGLE OAUTH ROUTES */
+/* GOOGLE AUTH */
 app.use("/api/auth", authRoutes);
-
-/* ALSO SUPPORT /auth FOR GOOGLE CALLBACK */
 app.use("/auth", authRoutes);
 
 /* ==========================
         PUBLIC PACKAGES
 ========================== */
+
 app.get("/api/packages", async (req, res) => {
   try {
     const list = await Package.find().sort({ createdAt: -1 });
@@ -143,10 +143,12 @@ app.get("/api/packages/:id", async (req, res) => {
 /* ==========================
         HOST ROUTES
 ========================== */
+
 app.use("/api/host/auth", hostAuthRoutes);
 app.use("/api/host/listings", hostListingRoutes);
 app.use("/api/host/bookings", hostBookingRoutes);
 app.use("/api/host/payments", hostPaymentRoutes);
+
 app.use("/api/bike-riders", bikeRidersRoutes);
 app.use("/api/guides", guideRoutes);
 app.use("/api/acting-drivers", actingDriverRoutes);
@@ -155,6 +157,7 @@ app.use("/api/pillion-requests", pillionRequestRoutes);
 /* ==========================
         PUBLIC LISTINGS
 ========================== */
+
 app.get("/api/listings", async (req, res) => {
   try {
     const list = await Listing.find({ approved: true }).sort({
@@ -172,7 +175,9 @@ app.get("/api/listings/:id", async (req, res) => {
       "hostId",
       "name email phoneNumber"
     );
+
     if (!listing) return res.status(404).json({ msg: "Listing not found" });
+
     res.json(listing);
   } catch (err) {
     res.status(500).json({ msg: "Failed to fetch listing" });
@@ -182,6 +187,7 @@ app.get("/api/listings/:id", async (req, res) => {
 /* ==========================
             ADMIN
 ========================== */
+
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/packages", adminPackageRoutes);
@@ -190,11 +196,13 @@ app.use("/api/admin/bookings", adminHostBookings);
 app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
 app.use("/api/admin/guides", adminGuideRoutes);
 app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
+
 app.use("/admin/bike-riders", adminBikeRidersRoutes);
 
 /* ==========================
-    BOOKINGS / PAYMENTS
+        BOOKINGS / PAYMENTS
 ========================== */
+
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/invoice", invoiceRoutes);
@@ -202,6 +210,7 @@ app.use("/api/invoice", invoiceRoutes);
 /* ==========================
         404 HANDLER
 ========================== */
+
 app.use((req, res) => {
   res.status(404).json({ error: "API route not found" });
 });
@@ -209,6 +218,7 @@ app.use((req, res) => {
 /* ==========================
         START SERVER
 ========================== */
+
 const PORT = process.env.PORT || 4000;
 
 async function startServer() {
