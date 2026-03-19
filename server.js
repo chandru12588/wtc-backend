@@ -20,7 +20,7 @@ import adminHostListingRoutes from "./routes/adminHostListings.js";
 import adminBikeRidersRoutes from "./routes/adminBikeRiders.js";
 import adminGuideRoutes from "./routes/adminGuides.js";
 import adminPillionRequestRoutes from "./routes/adminPillionRequests.js";
-import adminUserRoutes from "./routes/adminUsers.js";
+import adminUserRoutes from "./routes/adminUsers.js"; // ✅ ADD THIS
 
 import bookingRoutes from "./routes/bookings.js";
 import userAuthRoutes from "./routes/userAuth.js";
@@ -59,7 +59,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://wtc-chandru.vercel.app",
   "https://trippolama.com",
-  "https://www.trippolama.com",
+  "https://www.trippolama.com"
 ];
 
 app.use(
@@ -75,7 +75,7 @@ app.use(
         callback(new Error("CORS blocked"));
       }
     },
-    credentials: true,
+    credentials: true
   })
 );
 
@@ -93,8 +93,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      sameSite:
-        process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );
@@ -109,13 +108,13 @@ app.get("/api/health", (req, res) => {
 });
 
 /* AUTH */
-app.use("/api/auth/user", userAuthRoutes);
+app.use("/api/auth", userAuthRoutes);
 app.use("/api/auth/google", authRoutes);
 
 /* ADMIN */
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
-app.use("/api/admin/users", adminUserRoutes);
+app.use("/api/admin/users", adminUserRoutes); // ✅ FIX
 app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
@@ -123,48 +122,12 @@ app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
 app.use("/api/admin/guides", adminGuideRoutes);
 app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
 
-/* PUBLIC ROUTES */
-
-// ✅ GET ALL PACKAGES
+/* PUBLIC */
 app.get("/api/packages", async (req, res) => {
-  try {
-    const list = await Package.find().sort({ createdAt: -1 });
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ msg: "Failed to load packages" });
-  }
+  const list = await Package.find().sort({ createdAt: -1 });
+  res.json(list);
 });
 
-// ✅ GET SINGLE PACKAGE (🔥 MAIN FIX)
-app.get("/api/packages/:id", async (req, res) => {
-  try {
-    const pkg = await Package.findById(req.params.id);
-
-    if (!pkg) {
-      return res.status(404).json({ msg: "Package not found" });
-    }
-
-    res.json(pkg);
-  } catch (err) {
-    console.error("PACKAGE FETCH ERROR:", err);
-    res.status(500).json({ msg: "Error fetching package" });
-  }
-});
-
-// ✅ HOST LISTINGS FIX (🔥 IMPORTANT)
-app.get("/api/host/listings/all", async (req, res) => {
-  try {
-    const list = await Listing.find({ approved: true }).sort({
-      createdAt: -1,
-    });
-    res.json(list);
-  } catch (err) {
-    console.error("HOST LIST ERROR:", err);
-    res.status(500).json({ msg: "Failed to load listings" });
-  }
-});
-
-// (optional existing)
 app.get("/api/listings", async (req, res) => {
   const list = await Listing.find({ approved: true });
   res.json(list);
@@ -190,7 +153,5 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 4000;
 
 connectDB().then(() => {
-  app.listen(PORT, () =>
-    console.log(`Server running on ${PORT}`)
-  );
+  app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 });
