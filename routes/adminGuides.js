@@ -37,7 +37,7 @@ router.put("/:id/approve", requireAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: application.email,
-        subject: "Guide Application Approved - WrongTurnClub",
+        subject: "Guide Application Approved - Trippolama",
         html: `
           <h3>Hello ${application.fullName},</h3>
           <p>Your guide application has been approved.</p>
@@ -46,7 +46,7 @@ router.put("/:id/approve", requireAdmin, async (req, res) => {
           <p><b>Group Charge / Day:</b> ${application.currencySymbol} ${application.groupDayCharge}</p>
           ${notes ? `<p><b>Admin Notes:</b> ${notes}</p>` : ""}
           <br/>
-          <b>- WrongTurnClub</b>
+          <b>- Trippolama</b>
         `,
       });
     } catch (e) {
@@ -82,13 +82,13 @@ router.put("/:id/reject", requireAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: application.email,
-        subject: "Guide Application Update - WrongTurnClub",
+        subject: "Guide Application Update - Trippolama",
         html: `
           <h3>Hello ${application.fullName},</h3>
           <p>Your guide application has been rejected.</p>
           ${notes ? `<p><b>Admin Notes:</b> ${notes}</p>` : ""}
           <br/>
-          <b>- WrongTurnClub</b>
+          <b>- Trippolama</b>
         `,
       });
     } catch (e) {

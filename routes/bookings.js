@@ -126,15 +126,15 @@ router.post("/", bookingUpload, async (req, res) => {
 
     const idProofUrl = await uploadToCloudinary(
       req.files?.idProof?.[0],
-      "wrongturn/idproof"
+      "trippolama/idproof"
     );
     const profilePhotoUrl = await uploadToCloudinary(
       req.files?.profilePhoto?.[0],
-      "wrongturn/customer-photos"
+      "trippolama/customer-photos"
     );
     const vehicleImageUrl = await uploadToCloudinary(
       req.files?.vehicleImage?.[0],
-      "wrongturn/vehicle-images"
+      "trippolama/vehicle-images"
     );
 
     const booking = await Booking.create({
@@ -180,13 +180,13 @@ router.post("/", bookingUpload, async (req, res) => {
     try {
       await sendEmail({
         to: email,
-        subject: "Booking Received – WrongTurnClub",
+        subject: "Booking Received – Trippolama",
         html: `
           <h3>Hello ${name},</h3>
           <p>Your ${normalizedServiceType === "guide" ? "guide request" : normalizedServiceType === "driver" ? "driver request" : "booking"} for <b>${pkg.title}</b> has been received.</p>
           <p>We will confirm shortly.</p>
           <br/>
-          <b>– WrongTurnClub</b>
+          <b>– Trippolama</b>
         `,
       });
     } catch (e) {
@@ -247,7 +247,7 @@ router.put("/:id/cancel", async (req, res) => {
     try {
       await sendEmail({
         to: booking.email,
-        subject: "Booking Cancelled – WrongTurnClub",
+        subject: "Booking Cancelled – Trippolama",
         html: `
           <h3>Hello ${booking.name},</h3>
           <p>Your booking for <b>${booking.packageId?.title}</b> has been cancelled.</p>
@@ -258,7 +258,7 @@ router.put("/:id/cancel", async (req, res) => {
               : "No payment was captured."
           }</p>
           <br/>
-          <b>– WrongTurnClub</b>
+          <b>– Trippolama</b>
         `,
       });
     } catch (e) {
@@ -292,7 +292,7 @@ router.put("/:id/status", requireAdmin, async (req, res) => {
       try {
         await sendEmail({
           to: booking.email,
-          subject: "Booking Confirmed – WrongTurnClub ✅",
+          subject: "Booking Confirmed – Trippolama ✅",
           html: `
             <h3>Hello ${booking.name}</h3>
             <p>Your booking for <b>${booking.packageId.title}</b> is confirmed.</p>

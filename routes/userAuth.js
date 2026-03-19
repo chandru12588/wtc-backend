@@ -64,11 +64,11 @@ router.post("/send-otp", async (req, res) => {
 
       const emailResponse = await brevo.post("/smtp/email", {
         sender: {
-          name: "WrongTurn Club",
+          name: "Trippolama",
           email: "chandru.jerry@gmail.com",  // Your verified Brevo email
         },
         to: [{ email }],
-        subject: "Your WrongTurn Login OTP",
+        subject: "Trippolama Login OTP",
         htmlContent: `
           <h2>Your OTP Code</h2>
           <p style="font-size:22px;font-weight:bold;">${otp}</p>
@@ -284,7 +284,7 @@ router.post("/forgot-password", async (req, res) => {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
 
     await brevo.post("/smtp/email", {
-      sender: { name: "WrongTurn Club", email: "noreply@wrongturnclub.com" },
+      sender: { name: "Trippolama", email: "noreply@trippolama.com" },
       to: [{ email: user.email }],
       subject: "Password Reset Request",
       htmlContent: `

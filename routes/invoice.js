@@ -134,7 +134,7 @@ export async function generateInvoiceBuffer(data) {
       doc
         .fontSize(11)
         .fillColor("#555")
-        .text("Thank you for choosing WrongTurnClub!", 0, y, {
+        .text("Thank you for choosing Trippolama!", 0, y, {
           align: "center",
         });
 

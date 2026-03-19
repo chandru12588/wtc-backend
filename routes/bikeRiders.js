@@ -12,7 +12,7 @@ cloudinary.v2.config({
 const router = express.Router();
 const upload = multer();
 
-const uploadToCloudinary = async (file, folder = "wrongturn/bike-riders") => {
+const uploadToCloudinary = async (file, folder = "trippolama/bike-riders") => {
   if (!file) return "";
   const uploaded = await new Promise((resolve, reject) => {
     cloudinary.v2.uploader

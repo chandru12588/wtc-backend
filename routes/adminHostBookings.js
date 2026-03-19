@@ -53,7 +53,7 @@ router.put("/host/:id/status", requireAdmin, async (req, res) => {
       try {
         await sendEmail({
           to: booking.email,
-          subject: "Host Stay Booking Confirmed – WrongTurnClub ✅",
+          subject: "Host Stay Booking Confirmed – Trippolama ✅",
           html: `
             <h3>Hello ${booking.name}</h3>
             <p>Your stay at <b>${booking.listingId?.title}</b> is confirmed.</p>

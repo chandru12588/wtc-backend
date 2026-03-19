@@ -111,11 +111,11 @@ router.post("/", requestUpload, async (req, res) => {
 
     const idProofUrl = await uploadToCloudinary(
       req.files?.idProof?.[0],
-      "wrongturn/pillion-idproof"
+      "trippolama/pillion-idproof"
     );
     const customerPhotoUrl = await uploadToCloudinary(
       req.files?.profilePhoto?.[0],
-      "wrongturn/pillion-customer-photo"
+      "trippolama/pillion-customer-photo"
     );
 
     const request = await PillionRideRequest.create({
@@ -139,13 +139,13 @@ router.post("/", requestUpload, async (req, res) => {
     try {
       await sendEmail({
         to: email,
-        subject: "Pillion Ride Request Received - WrongTurnClub",
+        subject: "Pillion Ride Request Received - Trippolama",
         html: `
           <h3>Hello ${name},</h3>
           <p>Your pillion ride request for <b>${pkg.title}</b> has been received.</p>
           <p>Admin will review the request and assign a rider.</p>
           <br/>
-          <b>- WrongTurnClub</b>
+          <b>- Trippolama</b>
         `,
       });
     } catch (e) {

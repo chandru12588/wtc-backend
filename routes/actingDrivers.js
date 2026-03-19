@@ -14,7 +14,7 @@ const upload = multer();
 
 const uploadToCloudinary = async (
   file,
-  folder = "wrongturn/acting-drivers"
+  folder = "trippolama/acting-drivers"
 ) => {
   if (!file) return "";
   const uploaded = await new Promise((resolve, reject) => {

@@ -168,7 +168,7 @@ router.put("/:id/cancel", async (req, res) => {
     try {
       await sendEmail({
         to: booking.email,
-        subject: "Host Booking Cancelled – WrongTurnClub",
+        subject: "Host Booking Cancelled – Trippolama",
         html: `
           <h3>Hello ${booking.name},</h3>
           <p>Your booking for <b>${booking.listingId?.title}</b> has been cancelled.</p>
@@ -179,7 +179,7 @@ router.put("/:id/cancel", async (req, res) => {
               : "No payment was captured."
           }</p>
           <br/>
-          <b>– WrongTurnClub</b>
+          <b>– Trippolama</b>
         `,
       });
     } catch (e) {

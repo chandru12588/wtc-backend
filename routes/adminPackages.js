@@ -66,7 +66,7 @@ const uploadImages = async (files = []) => {
   for (const file of files) {
     const uploadRes = await new Promise((resolve, reject) => {
       cloudinary.v2.uploader
-        .upload_stream({ folder: "wrongturn" }, (err, result) =>
+        .upload_stream({ folder: "trippolama/packages" }, (err, result) =>
           err ? reject(err) : resolve(result)
         )
         .end(file.buffer);
