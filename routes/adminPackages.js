@@ -11,30 +11,53 @@ cloudinary.v2.config({
 
 const router = express.Router();
 const upload = multer();
+
 const packageUpload = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "replacementImages", maxCount: 10 },
 ]);
 
+/* ==============================
+   GET ALL PACKAGES (FIXED 🔥)
+============================== */
 router.get("/", async (_req, res) => {
   try {
     const pkgs = await Package.find().sort({ createdAt: -1 });
+
+    console.log("📦 Packages fetched:", pkgs.length);
+
+    // 🔥 FIX: Disable cache
+    res.set("Cache-Control", "no-store");
+
     res.json(pkgs);
-  } catch {
+  } catch (err) {
+    console.error("❌ GET PACKAGES ERROR:", err);
     res.status(500).json({ msg: "Failed to load packages" });
   }
 });
 
+/* ==============================
+   GET SINGLE PACKAGE
+============================== */
 router.get("/:id", async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
-    if (!pkg) return res.status(404).json({ msg: "Package not found" });
+
+    if (!pkg) {
+      return res.status(404).json({ msg: "Package not found" });
+    }
+
+    res.set("Cache-Control", "no-store");
     res.json(pkg);
-  } catch {
+  } catch (err) {
+    console.error("❌ GET PACKAGE ERROR:", err);
     res.status(500).json({ msg: "Invalid package ID" });
   }
 });
 
+/* ==============================
+   HELPER: PARSE DATA
+============================== */
 const parsePackagePayload = (body, existing = {}) => ({
   title: body.title,
   description: body.description,
@@ -60,6 +83,9 @@ const parsePackagePayload = (body, existing = {}) => ({
   isHostListing: false,
 });
 
+/* ==============================
+   HELPER: UPLOAD IMAGES
+============================== */
 const uploadImages = async (files = []) => {
   const images = [];
 
@@ -78,6 +104,9 @@ const uploadImages = async (files = []) => {
   return images;
 };
 
+/* ==============================
+   CREATE PACKAGE
+============================== */
 router.post("/", packageUpload, async (req, res) => {
   try {
     if (!req.body.startDate || !req.body.stayType || !req.body.category) {
@@ -92,13 +121,19 @@ router.post("/", packageUpload, async (req, res) => {
     data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
     const pkg = await Package.create({ ...data, images });
+
+    console.log("✅ Package created:", pkg._id);
+
     res.json(pkg);
   } catch (err) {
-    console.error("CREATE PACKAGE ERROR:", err);
+    console.error("❌ CREATE PACKAGE ERROR:", err);
     res.status(500).json({ msg: err.message });
   }
 });
 
+/* ==============================
+   UPDATE PACKAGE
+============================== */
 router.put("/:id", packageUpload, async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
@@ -114,17 +149,22 @@ router.put("/:id", packageUpload, async (req, res) => {
     const replacementTargets = req.body.replacementTargets
       ? JSON.parse(req.body.replacementTargets)
       : [];
+
     const replacementFiles = req.files?.replacementImages || [];
 
-    if (replacementTargets.length && replacementTargets.length !== replacementFiles.length) {
-      return res.status(400).json({ msg: "Replacement image data is invalid" });
+    if (
+      replacementTargets.length &&
+      replacementTargets.length !== replacementFiles.length
+    ) {
+      return res.status(400).json({ msg: "Replacement image data invalid" });
     }
 
     if (replacementTargets.length) {
       const uploadedReplacements = await uploadImages(replacementFiles);
+
       images = images.map((imageUrl) => {
-        const replacementIndex = replacementTargets.indexOf(imageUrl);
-        return replacementIndex >= 0 ? uploadedReplacements[replacementIndex] : imageUrl;
+        const idx = replacementTargets.indexOf(imageUrl);
+        return idx >= 0 ? uploadedReplacements[idx] : imageUrl;
       });
     }
 
@@ -136,18 +176,27 @@ router.put("/:id", packageUpload, async (req, res) => {
     pkg.set({ ...data, images });
     await pkg.save();
 
+    console.log("✏️ Package updated:", pkg._id);
+
     res.json(pkg);
   } catch (err) {
-    console.error("UPDATE PACKAGE ERROR:", err);
+    console.error("❌ UPDATE PACKAGE ERROR:", err);
     res.status(500).json({ msg: err.message });
   }
 });
 
+/* ==============================
+   DELETE PACKAGE
+============================== */
 router.delete("/:id", async (req, res) => {
   try {
     await Package.findByIdAndDelete(req.params.id);
+
+    console.log("🗑️ Package deleted:", req.params.id);
+
     res.json({ msg: "Deleted" });
-  } catch {
+  } catch (err) {
+    console.error("❌ DELETE ERROR:", err);
     res.status(500).json({ msg: "Delete failed" });
   }
 });
