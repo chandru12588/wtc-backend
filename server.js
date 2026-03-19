@@ -108,7 +108,7 @@ app.get("/api/health", (req, res) => {
 });
 
 /* AUTH */
-app.use("/api/auth", userAuthRoutes);
+app.use("/api/auth/user", userAuthRoutes);
 app.use("/api/auth/google", authRoutes);
 
 /* ADMIN */
