@@ -20,7 +20,7 @@ import adminHostListingRoutes from "./routes/adminHostListings.js";
 import adminBikeRidersRoutes from "./routes/adminBikeRiders.js";
 import adminGuideRoutes from "./routes/adminGuides.js";
 import adminPillionRequestRoutes from "./routes/adminPillionRequests.js";
-import adminUserRoutes from "./routes/adminUsers.js"; // ✅ ADD THIS
+import adminUserRoutes from "./routes/adminUsers.js";
 
 import bookingRoutes from "./routes/bookings.js";
 import userAuthRoutes from "./routes/userAuth.js";
@@ -28,15 +28,7 @@ import authRoutes from "./routes/auth.js";
 import paymentRoutes from "./routes/payments.js";
 import invoiceRoutes from "./routes/invoice.js";
 
-import hostAuthRoutes from "./routes/hostAuth.js";
 import hostListingRoutes from "./routes/hostListings.js";
-import hostBookingRoutes from "./routes/hostBookings.js";
-import hostPaymentRoutes from "./routes/hostPayments.js";
-
-import bikeRidersRoutes from "./routes/bikeRiders.js";
-import guideRoutes from "./routes/guides.js";
-import actingDriverRoutes from "./routes/actingDrivers.js";
-import pillionRequestRoutes from "./routes/pillionRequests.js";
 
 /* MODELS */
 import Package from "./models/Package.js";
@@ -68,7 +60,7 @@ app.use(
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
-        (origin && origin.includes("vercel.app"))
+        origin?.includes("vercel.app")
       ) {
         callback(null, true);
       } else {
@@ -107,14 +99,19 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Running 🚀" });
 });
 
-/* AUTH */
-app.use("/api/auth/user", userAuthRoutes);
+/* ================= AUTH FIX ================= */
+app.use("/api/auth", userAuthRoutes); // ✅ FIXED
+
+/* GOOGLE AUTH */
 app.use("/api/auth/google", authRoutes);
 
-/* ADMIN */
+/* ================= HOST FIX ================= */
+app.use("/api/host/listings", hostListingRoutes); // ✅ FIXED
+
+/* ================= ADMIN ================= */
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
-app.use("/api/admin/users", adminUserRoutes); // ✅ FIX
+app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/host-listings", adminHostListingRoutes);
 app.use("/api/admin/bookings", adminHostBookings);
@@ -122,15 +119,33 @@ app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
 app.use("/api/admin/guides", adminGuideRoutes);
 app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
 
-/* PUBLIC */
+/* ================= PUBLIC ================= */
+
+// ✅ ALL PACKAGES
 app.get("/api/packages", async (req, res) => {
   const list = await Package.find().sort({ createdAt: -1 });
   res.json(list);
 });
 
-app.get("/api/listings", async (req, res) => {
-  const list = await Listing.find({ approved: true });
-  res.json(list);
+// ✅ SINGLE PACKAGE (🔥 VERY IMPORTANT)
+app.get("/api/packages/:id", async (req, res) => {
+  try {
+    const pkg = await Package.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ msg: "Package not found" });
+    res.json(pkg);
+  } catch {
+    res.status(500).json({ msg: "Error fetching package" });
+  }
+});
+
+// ✅ HOST LISTINGS (optional backup route)
+app.get("/api/host/listings/all", async (req, res) => {
+  try {
+    const list = await Listing.find({ approved: true });
+    res.json(list);
+  } catch {
+    res.status(500).json({ msg: "Failed to load listings" });
+  }
 });
 
 /* BOOKINGS */
