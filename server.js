@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from "express";
 import session from "express-session";
+import MongoStore from "connect-mongo";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -80,17 +81,34 @@ app.use(limiter);
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    },
-  })
-);
+const isProduction = process.env.NODE_ENV === "production";
+const mongoSessionUrl = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET || "secret",
+  resave: false,
+  saveUninitialized: false,
+  proxy: isProduction,
+  cookie: {
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 1000 * 60 * 60 * 24,
+    httpOnly: true,
+  },
+};
+
+if (mongoSessionUrl) {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: mongoSessionUrl,
+    collectionName: "sessions",
+    ttl: 60 * 60 * 24,
+    autoRemove: "native",
+  });
+} else {
+  console.warn("SESSION WARNING: MONGO_URI/MONGODB_URI missing, using MemoryStore (dev only)");
+}
+
+app.use(session(sessionConfig));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -161,4 +179,6 @@ const PORT = process.env.PORT || 4000;
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 });
+
+
 

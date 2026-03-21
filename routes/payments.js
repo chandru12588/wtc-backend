@@ -7,7 +7,8 @@ const router = express.Router();
 /* ================================
       VERIFY ENV IS LOADED
 ================================ */
-console.log("🟢 Razorpay Key Loaded:", process.env.RAZORPAY_KEY_ID);
+const razorpayKeyId = process.env.RAZORPAY_KEY_ID || "";
+console.log("Razorpay mode:", razorpayKeyId.startsWith("rzp_live_") ? "LIVE" : "TEST");
 
 /* ================================
       INITIALIZE RAZORPAY
@@ -70,3 +71,4 @@ router.post("/verify", async (req, res) => {
 });
 
 export default router;
+
