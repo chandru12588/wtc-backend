@@ -8,8 +8,8 @@ const PackageSchema = new mongoose.Schema(
     country: { type: String, default: "" },
 
     // 📍 LOCATION
-    location: { type: String, required: true },  // Ooty
-    region: { type: String, required: true },    // Tamil Nadu
+    location: { type: String, required: true }, // Ooty
+    region: { type: String, required: true }, // Tamil Nadu
 
     // ⭐ Main Category for filtering
     category: { type: String, required: true },
@@ -22,7 +22,7 @@ const PackageSchema = new mongoose.Schema(
     // ⭐ NEW – Stay Type (A-frame / Tent / Mud house / Villa...)
     stayType: {
       type: String,
-      required: true,       // user must select stay type
+      required: true, // user must select stay type
     },
 
     // ⭐ MULTI-TAGS SUPPORT (future filter)
@@ -54,6 +54,19 @@ const PackageSchema = new mongoose.Schema(
     // Images
     images: [String],
     slug: String,
+
+    // Reviews aggregate
+    averageRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    reviewCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
     // differentiate admin vs host
     isHostListing: {

@@ -29,6 +29,9 @@ import invoiceRoutes from "./routes/invoice.js";
 import hostListingRoutes from "./routes/hostListings.js";
 import hostBookingRoutes from "./routes/hostBookings.js";
 import pillionRequestRoutes from "./routes/pillionRequests.js";
+import reviewRoutes from "./routes/reviews.js";
+import storyRoutes from "./routes/stories.js";
+import insightRoutes from "./routes/insights.js";
 
 import Package from "./models/Package.js";
 import Listing from "./models/Listing.js";
@@ -102,6 +105,9 @@ app.use("/api/auth/google", authRoutes);
 app.use("/api/host/listings", hostListingRoutes);
 app.use("/api/host/bookings", hostBookingRoutes);
 app.use("/api/pillion-requests", pillionRequestRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/stories", storyRoutes);
+app.use("/api/insights", insightRoutes);
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
@@ -155,3 +161,4 @@ const PORT = process.env.PORT || 4000;
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 });
+

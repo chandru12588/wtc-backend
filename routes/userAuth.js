@@ -117,6 +117,7 @@ router.post("/verify-otp", async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone || "",
+        dob: user.dob || null,
       },
     });
   } catch (err) {
@@ -133,7 +134,7 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ message: "No token" });
     }
 
-    const user = await User.findById(decoded.id).select("name email phone favorites");
+    const user = await User.findById(decoded.id).select("name email phone dob favorites");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -177,7 +178,13 @@ router.post("/register", async (req, res) => {
     res.status(201).json({
       message: "Registration successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email, phone: user.phone || "" },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        dob: user.dob || null,
+      },
     });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
@@ -215,7 +222,13 @@ router.post("/login", async (req, res) => {
     res.json({
       message: "Login successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email, phone: user.phone || "" },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        dob: user.dob || null,
+      },
     });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
@@ -312,6 +325,45 @@ router.post("/reset-password", async (req, res) => {
   } catch (err) {
     console.error("RESET PASSWORD ERROR:", err);
     res.status(500).json({ message: "Password reset failed" });
+  }
+});
+
+router.put("/profile", async (req, res) => {
+  try {
+    const decoded = decodeUser(req);
+    if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const { name, phone, dob } = req.body || {};
+
+    if (!name || !phone) {
+      return res.status(400).json({ message: "Name and mobile number are required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      decoded.id,
+      {
+        name: String(name).trim(),
+        phone: String(phone).trim(),
+        dob: dob || null,
+      },
+      { new: true, runValidators: true }
+    ).select("name email phone dob favorites");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({
+      message: "Profile updated",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        dob: user.dob || null,
+      },
+    });
+  } catch (err) {
+    console.error("PROFILE UPDATE ERROR:", err);
+    res.status(500).json({ message: "Failed to update profile" });
   }
 });
 
