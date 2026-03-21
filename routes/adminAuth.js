@@ -56,8 +56,9 @@ router.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
+    const normalizedRole = admin.role || "admin";
     const token = jwt.sign(
-      { id: admin._id, role: admin.role },
+      { id: admin._id, role: normalizedRole, email: admin.email },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -69,7 +70,7 @@ router.post("/login", async (req, res) => {
         _id: admin._id,
         name: admin.name,
         email: admin.email,
-        role: admin.role,
+        role: normalizedRole,
         createdAt: admin.createdAt,
       },
     });
