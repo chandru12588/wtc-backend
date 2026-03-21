@@ -24,6 +24,24 @@ function decodeUser(req) {
   return jwt.verify(token, process.env.JWT_SECRET || "devsecret");
 }
 
+async function findUserFromDecoded(decoded) {
+  if (!decoded) return null;
+
+  if (decoded.id) {
+    const byId = await User.findById(decoded.id);
+    if (byId) return byId;
+  }
+
+  if (decoded.email) {
+    const byEmail = await User.findOne({
+      email: String(decoded.email).trim().toLowerCase(),
+    });
+    if (byEmail) return byEmail;
+  }
+
+  return null;
+}
+
 router.post("/send-otp", async (req, res) => {
   try {
     if (!req.body) {
@@ -134,13 +152,20 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ message: "No token" });
     }
 
-    const user = await User.findById(decoded.id).select("name email phone dob favorites");
+    const user = await findUserFromDecoded(decoded);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(401).json({ message: "Session expired. Please login again" });
     }
 
-    res.json({ user });
+    const fullUser = await User.findById(user._id).select("name email phone dob favorites");
+    const refreshedToken =
+      String(user._id) !== String(decoded.id) ? createToken(user) : null;
+
+    res.json({
+      user: fullUser,
+      ...(refreshedToken ? { token: refreshedToken } : {}),
+    });
   } catch (err) {
     console.error("AUTH ERROR:", err);
     res.status(401).json({ message: "Invalid token" });
@@ -339,20 +364,24 @@ router.put("/profile", async (req, res) => {
       return res.status(400).json({ message: "Name and mobile number are required" });
     }
 
-    const user = await User.findByIdAndUpdate(
-      decoded.id,
-      {
-        name: String(name).trim(),
-        phone: String(phone).trim(),
-        dob: dob || null,
-      },
-      { new: true, runValidators: true }
-    ).select("name email phone dob favorites");
+    const existingUser = await findUserFromDecoded(decoded);
+    if (!existingUser) {
+      return res.status(401).json({ message: "Session expired. Please login again" });
+    }
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    existingUser.name = String(name).trim();
+    existingUser.phone = String(phone).trim();
+    existingUser.dob = dob || null;
+    await existingUser.save();
+
+    const user = await User.findById(existingUser._id).select("name email phone dob favorites");
+
+    const refreshedToken =
+      String(existingUser._id) !== String(decoded.id) ? createToken(existingUser) : null;
 
     res.json({
       message: "Profile updated",
+      ...(refreshedToken ? { token: refreshedToken } : {}),
       user: {
         id: user._id,
         name: user.name,
@@ -376,8 +405,15 @@ router.get("/favorites", async (req, res) => {
     const decoded = decodeUser(req);
     if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
 
-    const user = await User.findById(decoded.id).select("favorites");
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const existingUser = await findUserFromDecoded(decoded);
+    if (!existingUser) {
+      return res.status(401).json({ message: "Session expired. Please login again" });
+    }
+
+    const user = await User.findById(existingUser._id).select("favorites");
+    if (!user) {
+      return res.status(401).json({ message: "Session expired. Please login again" });
+    }
 
     res.json({ favorites: user.favorites || [] });
   } catch (err) {
@@ -394,8 +430,15 @@ router.post("/favorites/toggle", async (req, res) => {
     const { itemId, itemType = "package", title, location, image, price, serviceType } = req.body;
     if (!itemId) return res.status(400).json({ message: "itemId is required" });
 
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const existingUser = await findUserFromDecoded(decoded);
+    if (!existingUser) {
+      return res.status(401).json({ message: "Session expired. Please login again" });
+    }
+
+    const user = await User.findById(existingUser._id);
+    if (!user) {
+      return res.status(401).json({ message: "Session expired. Please login again" });
+    }
 
     const existingIndex = user.favorites.findIndex((fav) => fav.itemId === String(itemId));
 
@@ -429,8 +472,10 @@ router.delete("/account", async (req, res) => {
     const decoded = decodeUser(req);
     if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
 
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await findUserFromDecoded(decoded);
+    if (!user) {
+      return res.status(401).json({ message: "Session expired. Please login again" });
+    }
 
     await Promise.all([
       Booking.deleteMany({ userId: user._id }),
