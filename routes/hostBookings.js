@@ -130,8 +130,21 @@ router.get("/user/:userId", async (req, res) => {
       .sort({ createdAt: -1 });
 
     res.json(list);
-  } catch {
-    res.status(500).json({ msg: "Failed to load user bookings" });
+  } catch (err) {
+    try {
+      const fallback = await HostBooking.find({
+        userId: req.params.userId,
+        bookingStatus: { $ne: "rejected" },
+      })
+        .populate("listingId")
+        .sort({ createdAt: -1 });
+
+      return res.json(fallback);
+    } catch (fallbackErr) {
+      console.error("HOST USER BOOKINGS ERROR:", err);
+      console.error("HOST USER BOOKINGS FALLBACK ERROR:", fallbackErr);
+      res.status(500).json({ msg: "Failed to load user bookings" });
+    }
   }
 });
 
