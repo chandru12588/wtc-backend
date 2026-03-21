@@ -193,4 +193,27 @@ router.put("/:id/cancel", async (req, res) => {
   }
 });
 
+/* ---------------------------------------
+   USER DELETE HOST BOOKING
+----------------------------------------- */
+router.delete("/:id/user-delete", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ msg: "userId is required" });
+
+    const booking = await HostBooking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ msg: "Booking not found" });
+
+    if (String(booking.userId) !== String(userId)) {
+      return res.status(403).json({ msg: "Not allowed to delete this booking" });
+    }
+
+    await HostBooking.findByIdAndDelete(req.params.id);
+    res.json({ msg: "Booking deleted" });
+  } catch (err) {
+    console.error("DELETE HOST BOOKING ERROR:", err);
+    res.status(500).json({ msg: "Delete failed" });
+  }
+});
+
 export default router;

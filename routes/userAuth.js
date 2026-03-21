@@ -2,13 +2,13 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import passport from "../config/passport.js";
 import User from "../models/User.js";
+import Booking from "../models/Booking.js";
+import HostBooking from "../models/HostBooking.js";
+import PillionRideRequest from "../models/PillionRideRequest.js";
 import { brevo } from "../config/brevo.js";
 
 const router = express.Router();
 
-/* ===============================
-   Helper: Create JWT Token
-================================ */
 function createToken(user) {
   return jwt.sign(
     { id: user._id, email: user.email },
@@ -17,9 +17,13 @@ function createToken(user) {
   );
 }
 
-/* ===============================
-   1) SEND OTP (Brevo HTTP API)
-================================ */
+function decodeUser(req) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) return null;
+  const token = auth.split(" ")[1];
+  return jwt.verify(token, process.env.JWT_SECRET || "devsecret");
+}
+
 router.post("/send-otp", async (req, res) => {
   try {
     if (!req.body) {
@@ -32,6 +36,10 @@ router.post("/send-otp", async (req, res) => {
       return res.status(400).json({ message: "Email required" });
     }
 
+    if ((name || dob) && !phone) {
+      return res.status(400).json({ message: "Mobile number required for signup" });
+    }
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     let user = await User.findOne({ email });
@@ -40,32 +48,20 @@ router.post("/send-otp", async (req, res) => {
       const fallbackName = (name && name.trim()) || email.split("@")[0] || "User";
       user = await User.create({ name: fallbackName, email, phone, dob });
     } else {
-      if (name && name.trim()) {
-        user.name = name.trim();
-      }
-      if (typeof phone !== "undefined") {
-        user.phone = phone;
-      }
-      if (dob) {
-        user.dob = dob;
-      }
+      if (name && name.trim()) user.name = name.trim();
+      if (typeof phone !== "undefined") user.phone = phone;
+      if (dob) user.dob = dob;
     }
 
     user.otpCode = otp;
-    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    // ✅ SEND EMAIL USING BREVO HTTP API (AXIOS)
     try {
-      console.log("📧 Attempting to send OTP email...");
-      console.log("🔑 BREVO_API_KEY set:", !!process.env.BREVO_API_KEY);
-      console.log("📨 Sending to:", email);
-      console.log("🤖 OTP Code:", otp);
-
-      const emailResponse = await brevo.post("/smtp/email", {
+      await brevo.post("/smtp/email", {
         sender: {
           name: "Trippolama",
-          email: "chandru.jerry@gmail.com",  // Your verified Brevo email
+          email: "chandru.jerry@gmail.com",
         },
         to: [{ email }],
         subject: "Trippolama Login OTP",
@@ -75,30 +71,17 @@ router.post("/send-otp", async (req, res) => {
           <p>Use this OTP to login. It expires in 10 minutes.</p>
         `,
       });
-      console.log("✅ OTP email sent successfully:", emailResponse.status);
     } catch (emailError) {
-      console.error("❌ BREVO EMAIL ERROR:", emailError?.response?.data || emailError.message);
-      console.error("❌ BREVO ERROR DETAILS:", {
-        status: emailError?.response?.status,
-        statusText: emailError?.response?.statusText,
-        data: emailError?.response?.data,
-        message: emailError?.message
-      });
-      console.log("⚠️  OTP generated:", otp, "for email:", email);
+      console.error("BREVO EMAIL ERROR:", emailError?.response?.data || emailError.message);
     }
-
-    console.log("📨 OTP sent to:", email);
 
     res.json({ message: "OTP sent to your email" });
   } catch (err) {
-    console.error("❌ SEND OTP ERROR:", err?.response?.data || err);
+    console.error("SEND OTP ERROR:", err?.response?.data || err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/* ===============================
-   2) VERIFY OTP + LOGIN
-================================ */
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -133,29 +116,24 @@ router.post("/verify-otp", async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || "",
       },
     });
   } catch (err) {
-    console.error("❌ VERIFY OTP ERROR:", err);
+    console.error("VERIFY OTP ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/* ===============================
-   3) LOGGED-IN USER DETAILS
-================================ */
 router.get("/me", async (req, res) => {
   try {
-    const auth = req.headers.authorization;
+    const decoded = decodeUser(req);
 
-    if (!auth?.startsWith("Bearer ")) {
+    if (!decoded?.id) {
       return res.status(401).json({ message: "No token" });
     }
 
-    const token = auth.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "devsecret");
-
-    const user = await User.findById(decoded.id).select("name email");
+    const user = await User.findById(decoded.id).select("name email phone favorites");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -163,58 +141,50 @@ router.get("/me", async (req, res) => {
 
     res.json({ user });
   } catch (err) {
-    console.error("❌ AUTH ERROR:", err);
+    console.error("AUTH ERROR:", err);
     res.status(401).json({ message: "Invalid token" });
   }
 });
 
-/* ===============================
-   4) REGISTER WITH PASSWORD
-================================ */
 router.post("/register", async (req, res) => {
   try {
     const { name, email, phone, dob, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email & password required" });
+    if (!name || !email || !phone || !password) {
+      return res
+        .status(400)
+        .json({ message: "Name, email, mobile number & password required" });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password manually
-    const bcrypt = (await import('bcryptjs')).default;
+    const bcrypt = (await import("bcryptjs")).default;
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
     const user = await User.create({
       name,
       email,
       phone,
       dob,
-      password: hashedPassword
+      password: hashedPassword,
     });
 
-    // Create token
     const token = createToken(user);
 
     res.status(201).json({
       message: "Registration successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone || "" },
     });
   } catch (err) {
-    console.error("❌ REGISTER ERROR:", err);
+    console.error("REGISTER ERROR:", err);
     res.status(500).json({ message: "Registration failed" });
   }
 });
 
-/* ===============================
-   5) LOGIN WITH PASSWORD
-================================ */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -223,42 +193,36 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Email & password required" });
     }
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Check if user has a password set
     if (!user.password) {
       return res.status(400).json({
-        message: "This account was created with OTP login. Please use OTP to login or reset your password."
+        message:
+          "This account was created with OTP login. Please use OTP to login or reset your password.",
       });
     }
 
-    // Check password
     const isValidPassword = await user.comparePassword(password);
     if (!isValidPassword) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Create token
     const token = createToken(user);
 
     res.json({
       message: "Login successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone || "" },
     });
   } catch (err) {
-    console.error("❌ LOGIN ERROR:", err);
+    console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Login failed" });
   }
 });
 
-/* ===============================
-   6) FORGOT PASSWORD
-================================ */
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -272,16 +236,16 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Generate reset token
-    const crypto = await import('crypto');
-    const resetToken = crypto.randomBytes(32).toString('hex');
+    const crypto = await import("crypto");
+    const resetToken = crypto.randomBytes(32).toString("hex");
 
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
+    const resetUrl = `${
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    }/reset-password/${resetToken}`;
 
     await brevo.post("/smtp/email", {
       sender: { name: "Trippolama", email: "noreply@trippolama.com" },
@@ -297,14 +261,11 @@ router.post("/forgot-password", async (req, res) => {
 
     res.json({ message: "Password reset email sent" });
   } catch (err) {
-    console.error("❌ FORGOT PASSWORD ERROR:", err);
+    console.error("FORGOT PASSWORD ERROR:", err);
     res.status(500).json({ message: "Failed to send reset email" });
   }
 });
 
-/* ===============================
-   7) RESET PASSWORD
-================================ */
 router.post("/reset-password", async (req, res) => {
   try {
     const { token, email, otp, password } = req.body;
@@ -318,7 +279,7 @@ router.post("/reset-password", async (req, res) => {
     if (token) {
       user = await User.findOne({
         resetPasswordToken: token,
-        resetPasswordExpires: { $gt: Date.now() }
+        resetPasswordExpires: { $gt: Date.now() },
       });
 
       if (!user) {
@@ -341,8 +302,7 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Token or email & OTP required" });
     }
 
-    // Hash new password manually
-    const bcrypt = (await import('bcryptjs')).default;
+    const bcrypt = (await import("bcryptjs")).default;
     user.password = await bcrypt.hash(password, 12);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
@@ -350,27 +310,100 @@ router.post("/reset-password", async (req, res) => {
 
     res.json({ message: "Password reset successful" });
   } catch (err) {
-    console.error("❌ RESET PASSWORD ERROR:", err);
+    console.error("RESET PASSWORD ERROR:", err);
     res.status(500).json({ message: "Password reset failed" });
   }
 });
 
-/* ===============================
-   8) TEST ROUTE
-================================ */
 router.get("/test", (req, res) => {
-  res.json({ message: "User Auth Route Working ✔️" });
+  res.json({ message: "User Auth Route Working" });
 });
 
-/* ===============================
-   GOOGLE AUTH ROUTES
-================================ */
+router.get("/favorites", async (req, res) => {
+  try {
+    const decoded = decodeUser(req);
+    if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await User.findById(decoded.id).select("favorites");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({ favorites: user.favorites || [] });
+  } catch (err) {
+    console.error("FAVORITES LOAD ERROR:", err);
+    res.status(500).json({ message: "Failed to load favorites" });
+  }
+});
+
+router.post("/favorites/toggle", async (req, res) => {
+  try {
+    const decoded = decodeUser(req);
+    if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const { itemId, itemType = "package", title, location, image, price, serviceType } = req.body;
+    if (!itemId) return res.status(400).json({ message: "itemId is required" });
+
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const existingIndex = user.favorites.findIndex((fav) => fav.itemId === String(itemId));
+
+    if (existingIndex >= 0) {
+      user.favorites.splice(existingIndex, 1);
+      await user.save();
+      return res.json({ favorite: false, favorites: user.favorites || [] });
+    }
+
+    user.favorites.push({
+      itemId: String(itemId),
+      itemType,
+      title: title || "",
+      location: location || "",
+      image: image || "",
+      price: Number(price || 0),
+      serviceType: serviceType || "general",
+      addedAt: new Date(),
+    });
+    await user.save();
+
+    res.json({ favorite: true, favorites: user.favorites || [] });
+  } catch (err) {
+    console.error("FAVORITE TOGGLE ERROR:", err);
+    res.status(500).json({ message: "Failed to update favorite" });
+  }
+});
+
+router.delete("/account", async (req, res) => {
+  try {
+    const decoded = decodeUser(req);
+    if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    await Promise.all([
+      Booking.deleteMany({ userId: user._id }),
+      HostBooking.deleteMany({ userId: user._id }),
+      PillionRideRequest.deleteMany({ userId: user._id }),
+    ]);
+
+    await User.findByIdAndDelete(user._id);
+
+    res.json({ message: "Account deleted successfully" });
+  } catch (err) {
+    console.error("ACCOUNT DELETE ERROR:", err);
+    res.status(500).json({ message: "Failed to delete account" });
+  }
+});
+
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
-router.get("/google/callback", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
-  const token = createToken(req.user);
-  // Redirect to frontend with token
-  res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?token=${token}`);
-});
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  (req, res) => {
+    const token = createToken(req.user);
+    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/login?token=${token}`);
+  }
+);
 
 export default router;

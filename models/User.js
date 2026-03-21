@@ -56,6 +56,22 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
     },
+
+    favorites: {
+      type: [
+        {
+          itemId: { type: String, required: true },
+          itemType: { type: String, enum: ["package", "listing"], default: "package" },
+          title: { type: String, default: "" },
+          location: { type: String, default: "" },
+          image: { type: String, default: "" },
+          price: { type: Number, default: 0 },
+          serviceType: { type: String, default: "general" },
+          addedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

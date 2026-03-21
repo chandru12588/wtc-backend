@@ -191,4 +191,24 @@ router.get("/user/:userId", async (req, res) => {
   }
 });
 
+router.delete("/:id/user-delete", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ message: "userId is required" });
+
+    const request = await PillionRideRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: "Request not found" });
+
+    if (String(request.userId) !== String(userId)) {
+      return res.status(403).json({ message: "Not allowed to delete this request" });
+    }
+
+    await PillionRideRequest.findByIdAndDelete(req.params.id);
+    res.json({ message: "Request deleted" });
+  } catch (err) {
+    console.error("PILLION DELETE ERROR:", err);
+    res.status(500).json({ message: "Failed to delete request" });
+  }
+});
+
 export default router;

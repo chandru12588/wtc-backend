@@ -273,6 +273,33 @@ router.put("/:id/cancel", async (req, res) => {
 });
 
 /* ======================================================
+   USER â€” DELETE OWN PACKAGE BOOKING
+====================================================== */
+router.delete("/:id/user-delete", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (String(booking.userId) !== String(userId)) {
+      return res.status(403).json({ message: "Not allowed to delete this booking" });
+    }
+
+    await Booking.findByIdAndDelete(req.params.id);
+    res.json({ message: "Booking deleted" });
+  } catch (err) {
+    console.error("PACKAGE DELETE ERROR:", err);
+    res.status(500).json({ message: "Failed to delete booking" });
+  }
+});
+
+/* ======================================================
    ADMIN — ACCEPT / REJECT PACKAGE BOOKINGS
 ====================================================== */
 router.put("/:id/status", requireAdmin, async (req, res) => {
