@@ -35,14 +35,11 @@ import Listing from "./models/Listing.js";
 
 const app = express();
 
+// Required on Railway/proxy so rate-limit sees real client IP
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(morgan("dev"));
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-});
-app.use(limiter);
 
 const allowedOrigins = [
   "http://localhost:3000",
@@ -68,10 +65,17 @@ app.use(
   })
 );
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.set("trust proxy", 1);
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "secret",
