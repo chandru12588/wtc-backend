@@ -1,13 +1,19 @@
 import express from "express";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import Package from "../models/Package.js";
 import PillionRideRequest from "../models/PillionRideRequest.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { requireUser } from "../middleware/auth.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { publicWriteLimiter, uploadLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 20,
+  allowImages: true,
+  allowVideos: false,
+  allowPdf: true,
+});
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -57,7 +63,7 @@ function inferServiceType(pkg) {
   return "general";
 }
 
-router.post("/", requestUpload, async (req, res) => {
+router.post("/", publicWriteLimiter, uploadLimiter, requestUpload, async (req, res) => {
   try {
     const {
       userId,
@@ -214,3 +220,4 @@ router.delete("/:id/user-delete", requireUser, async (req, res) => {
 });
 
 export default router;
+

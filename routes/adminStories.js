@@ -1,12 +1,18 @@
 import express from "express";
 import jwt from "jsonwebtoken";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import Admin from "../models/Admin.js";
 import TravelStory from "../models/TravelStory.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { uploadLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 80,
+  allowImages: true,
+  allowVideos: true,
+  allowPdf: false,
+});
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -70,7 +76,7 @@ router.get("/", requireAdmin, async (_req, res) => {
   }
 });
 
-router.post("/", requireAdmin, upload.array("media", 8), async (req, res) => {
+router.post("/", requireAdmin, uploadLimiter, upload.array("media", 8), async (req, res) => {
   try {
     const title = String(req.body.title || "").trim();
     const content = String(req.body.content || "").trim();

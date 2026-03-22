@@ -1,13 +1,20 @@
 import express from "express";
 import jwt from "jsonwebtoken";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import Package from "../models/Package.js";
 import User from "../models/User.js";
 import PackageReview from "../models/PackageReview.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { publicWriteLimiter, uploadLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 80,
+  allowImages: true,
+  allowVideos: true,
+  allowPdf: false,
+});
+const MAX_REVIEW_VIDEO_SECONDS = 60;
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -45,6 +52,15 @@ async function uploadMediaFile(file, folder) {
   const mediaType = String(uploaded.resource_type || "image").includes("video")
     ? "video"
     : "image";
+
+  if (mediaType === "video" && Number(uploaded.duration || 0) > MAX_REVIEW_VIDEO_SECONDS) {
+    if (uploaded.public_id) {
+      await cloudinary.v2.uploader.destroy(uploaded.public_id, { resource_type: "video" });
+    }
+    const err = new Error(`Each video must be ${MAX_REVIEW_VIDEO_SECONDS} seconds or less`);
+    err.statusCode = 400;
+    throw err;
+  }
 
   return {
     url: uploaded.secure_url,
@@ -91,7 +107,12 @@ router.get("/package/:packageId", async (req, res) => {
   }
 });
 
-router.post("/package/:packageId", upload.array("media", 4), async (req, res) => {
+router.post(
+  "/package/:packageId",
+  publicWriteLimiter,
+  uploadLimiter,
+  upload.array("media", 4),
+  async (req, res) => {
   try {
     const decoded = decodeUser(req);
     if (!decoded?.id) {
@@ -156,7 +177,8 @@ router.post("/package/:packageId", upload.array("media", 4), async (req, res) =>
     console.error("REVIEW SAVE ERROR:", err);
     res.status(500).json({ message: "Failed to save review" });
   }
-});
+  }
+);
 
 router.get("/featured", async (req, res) => {
   try {

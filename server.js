@@ -198,7 +198,9 @@ app.use("/api/invoice", invoiceRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ message: err.message });
+  const statusCode =
+    err?.statusCode || (err?.name === "MulterError" ? 400 : 500);
+  res.status(statusCode).json({ message: err?.message || "Server error" });
 });
 
 app.use((req, res) => {

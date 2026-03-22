@@ -1,7 +1,8 @@
 import express from "express";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import BikeRiderApplication from "../models/BikeRiderApplication.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { publicWriteLimiter, uploadLimiter } from "../middleware/rateLimiters.js";
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,7 +11,12 @@ cloudinary.v2.config({
 });
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 20,
+  allowImages: true,
+  allowVideos: false,
+  allowPdf: true,
+});
 
 const uploadToCloudinary = async (file, folder = "trippolama/bike-riders") => {
   if (!file) return "";
@@ -24,6 +30,8 @@ const uploadToCloudinary = async (file, folder = "trippolama/bike-riders") => {
 
 router.post(
   "/apply",
+  publicWriteLimiter,
+  uploadLimiter,
   upload.fields([
     { name: "rcImage", maxCount: 1 },
     { name: "licenseImage", maxCount: 1 },

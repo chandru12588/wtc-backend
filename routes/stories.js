@@ -1,12 +1,18 @@
 import express from "express";
 import jwt from "jsonwebtoken";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import User from "../models/User.js";
 import TravelStory from "../models/TravelStory.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { publicWriteLimiter, uploadLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 80,
+  allowImages: true,
+  allowVideos: true,
+  allowPdf: false,
+});
 const MAX_STORY_VIDEO_SECONDS = 60;
 
 cloudinary.v2.config({
@@ -77,7 +83,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", upload.array("media", 6), async (req, res) => {
+router.post("/", publicWriteLimiter, uploadLimiter, upload.array("media", 6), async (req, res) => {
   try {
     const decoded = decodeUser(req);
     if (!decoded?.id) {

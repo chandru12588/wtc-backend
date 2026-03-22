@@ -1,9 +1,10 @@
 // backend/routes/hostBookings.js
 import express from "express";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import HostBooking from "../models/HostBooking.js";
 import { requireUser } from "../middleware/auth.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { publicWriteLimiter, uploadLimiter } from "../middleware/rateLimiters.js";
 import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO HTTP API
 
 const router = express.Router();
@@ -20,13 +21,17 @@ cloudinary.v2.config({
 /* ---------------------------------------
    MULTER STORAGE
 ----------------------------------------- */
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = createMemoryUpload({
+  maxFileSizeMB: 20,
+  allowImages: true,
+  allowVideos: false,
+  allowPdf: true,
+});
 
 /* ---------------------------------------
    UPLOAD ID PROOF
 ----------------------------------------- */
-router.post("/upload-id", upload.single("file"), async (req, res) => {
+router.post("/upload-id", uploadLimiter, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: "No file uploaded" });
 
@@ -44,7 +49,7 @@ router.post("/upload-id", upload.single("file"), async (req, res) => {
 /* ---------------------------------------
    CREATE HOST BOOKING
 ----------------------------------------- */
-router.post("/", async (req, res) => {
+router.post("/", publicWriteLimiter, async (req, res) => {
   try {
     const {
       listingId,
@@ -236,3 +241,4 @@ router.delete("/:id/user-delete", requireUser, async (req, res) => {
 });
 
 export default router;
+

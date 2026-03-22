@@ -1,14 +1,20 @@
 import express from "express";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import Booking from "../models/Booking.js";
 import Package from "../models/Package.js";
 import { requireAdmin, requireUser } from "../middleware/auth.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { publicWriteLimiter, uploadLimiter } from "../middleware/rateLimiters.js";
 import { generateInvoiceBuffer } from "./invoice.js";
 import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO API
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 20,
+  allowImages: true,
+  allowVideos: false,
+  allowPdf: true,
+});
 const bookingUpload = upload.fields([
   { name: "idProof", maxCount: 1 },
   { name: "profilePhoto", maxCount: 1 },
@@ -82,7 +88,7 @@ router.get("/admin/all", requireAdmin, async (req, res) => {
 /* ======================================================
    CREATE PACKAGE BOOKING
 ====================================================== */
-router.post("/", bookingUpload, async (req, res) => {
+router.post("/", publicWriteLimiter, uploadLimiter, bookingUpload, async (req, res) => {
   try {
     const {
       userId,
@@ -353,3 +359,5 @@ router.put("/:id/status", requireAdmin, async (req, res) => {
 });
 
 export default router;
+
+

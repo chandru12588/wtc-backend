@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Admin from "../models/Admin.js";
+import { authLoginLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ function requireAdmin(req, res, next) {
 }
 
 /* ADMIN REGISTER (first time only) */
-router.post("/register", async (req, res) => {
+router.post("/register", authLoginLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const totalAdmins = await Admin.countDocuments();
@@ -65,7 +66,7 @@ router.post("/register", async (req, res) => {
 });
 
 /* LOGIN */
-router.post("/login", async (req, res) => {
+router.post("/login", authLoginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -98,7 +99,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/change-password", requireAdmin, async (req, res) => {
+router.post("/change-password", authLoginLimiter, requireAdmin, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 

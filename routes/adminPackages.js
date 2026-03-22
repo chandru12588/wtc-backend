@@ -1,9 +1,10 @@
 import express from "express";
-import multer from "multer";
 import cloudinary from "cloudinary";
 import jwt from "jsonwebtoken";
 import Package from "../models/Package.js";
 import Admin from "../models/Admin.js";
+import { createMemoryUpload } from "../middleware/upload.js";
+import { uploadLimiter } from "../middleware/rateLimiters.js";
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -12,7 +13,12 @@ cloudinary.v2.config({
 });
 
 const router = express.Router();
-const upload = multer();
+const upload = createMemoryUpload({
+  maxFileSizeMB: 80,
+  allowImages: true,
+  allowVideos: true,
+  allowPdf: false,
+});
 
 const requireAdmin = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -133,7 +139,7 @@ const uploadAssets = async (files = [], folder = "trippolama/packages") => {
 /* ==============================
    CREATE PACKAGE
 ============================== */
-router.post("/", packageUpload, async (req, res) => {
+router.post("/", uploadLimiter, packageUpload, async (req, res) => {
   try {
     if (!req.body.startDate || !req.body.stayType || !req.body.category) {
       return res
@@ -161,7 +167,7 @@ router.post("/", packageUpload, async (req, res) => {
 /* ==============================
    UPDATE PACKAGE
 ============================== */
-router.put("/:id", packageUpload, async (req, res) => {
+router.put("/:id", uploadLimiter, packageUpload, async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id);
     if (!pkg) return res.status(404).json({ msg: "Package not found" });

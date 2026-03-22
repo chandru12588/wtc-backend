@@ -6,6 +6,12 @@ import Booking from "../models/Booking.js";
 import HostBooking from "../models/HostBooking.js";
 import PillionRideRequest from "../models/PillionRideRequest.js";
 import { brevo } from "../config/brevo.js";
+import {
+  authLoginLimiter,
+  otpSendLimiter,
+  otpVerifyLimiter,
+  passwordRecoveryLimiter,
+} from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
@@ -42,7 +48,7 @@ async function findUserFromDecoded(decoded) {
   return null;
 }
 
-router.post("/send-otp", async (req, res) => {
+router.post("/send-otp", otpSendLimiter, async (req, res) => {
   try {
     if (!req.body) {
       return res.status(400).json({ message: "Request body missing" });
@@ -100,7 +106,7 @@ router.post("/send-otp", async (req, res) => {
   }
 });
 
-router.post("/verify-otp", async (req, res) => {
+router.post("/verify-otp", otpVerifyLimiter, async (req, res) => {
   try {
     const { email, otp } = req.body;
 
@@ -172,7 +178,7 @@ router.get("/me", async (req, res) => {
   }
 });
 
-router.post("/register", async (req, res) => {
+router.post("/register", authLoginLimiter, async (req, res) => {
   try {
     const { name, email, phone, dob, password } = req.body;
 
@@ -217,7 +223,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", authLoginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -261,7 +267,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", passwordRecoveryLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -304,7 +310,7 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", passwordRecoveryLimiter, async (req, res) => {
   try {
     const { token, email, otp, password } = req.body;
 
