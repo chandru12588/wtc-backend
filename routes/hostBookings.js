@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import cloudinary from "cloudinary";
 import HostBooking from "../models/HostBooking.js";
+import { requireUser } from "../middleware/auth.js";
 import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO HTTP API
 
 const router = express.Router();
@@ -119,10 +120,14 @@ router.get("/host/:hostId", async (req, res) => {
 /* ---------------------------------------
    GET BOOKINGS FOR USER
 ----------------------------------------- */
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", requireUser, async (req, res) => {
   try {
+    if (String(req.user.id) !== String(req.params.userId)) {
+      return res.status(403).json({ msg: "Not allowed" });
+    }
+
     const list = await HostBooking.find({
-      userId: req.params.userId,
+      userId: req.user.id,
       bookingStatus: { $ne: "rejected" },
     })
       .populate("listingId")
@@ -133,7 +138,7 @@ router.get("/user/:userId", async (req, res) => {
   } catch (err) {
     try {
       const fallback = await HostBooking.find({
-        userId: req.params.userId,
+        userId: req.user.id,
         bookingStatus: { $ne: "rejected" },
       })
         .populate("listingId")
@@ -151,7 +156,7 @@ router.get("/user/:userId", async (req, res) => {
 /* ---------------------------------------
    USER CANCEL HOST BOOKING
 ----------------------------------------- */
-router.put("/:id/cancel", async (req, res) => {
+router.put("/:id/cancel", requireUser, async (req, res) => {
   try {
     const booking = await HostBooking.findById(req.params.id).populate(
       "listingId"
@@ -159,6 +164,10 @@ router.put("/:id/cancel", async (req, res) => {
 
     if (!booking)
       return res.status(404).json({ msg: "Booking not found" });
+
+    if (String(booking.userId) !== String(req.user.id)) {
+      return res.status(403).json({ msg: "Not allowed to cancel this booking" });
+    }
 
     if (new Date() >= new Date(booking.checkIn)) {
       return res
@@ -209,15 +218,12 @@ router.put("/:id/cancel", async (req, res) => {
 /* ---------------------------------------
    USER DELETE HOST BOOKING
 ----------------------------------------- */
-router.delete("/:id/user-delete", async (req, res) => {
+router.delete("/:id/user-delete", requireUser, async (req, res) => {
   try {
-    const { userId } = req.query;
-    if (!userId) return res.status(400).json({ msg: "userId is required" });
-
     const booking = await HostBooking.findById(req.params.id);
     if (!booking) return res.status(404).json({ msg: "Booking not found" });
 
-    if (String(booking.userId) !== String(userId)) {
+    if (String(booking.userId) !== String(req.user.id)) {
       return res.status(403).json({ msg: "Not allowed to delete this booking" });
     }
 

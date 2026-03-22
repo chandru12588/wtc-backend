@@ -26,6 +26,25 @@ function requireAdmin(req, res, next) {
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const totalAdmins = await Admin.countDocuments();
+    const bootstrapKey = String(process.env.ADMIN_BOOTSTRAP_KEY || "");
+    const headerKey = String(req.headers["x-admin-bootstrap-key"] || "");
+
+    if (totalAdmins > 0) {
+      return res.status(403).json({ message: "Admin registration is closed" });
+    }
+
+    if (bootstrapKey && headerKey !== bootstrapKey) {
+      return res.status(403).json({ message: "Invalid bootstrap key" });
+    }
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email and password are required" });
+    }
+
+    if (String(password).length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
 
     const exists = await Admin.findOne({ email });
     if (exists) return res.status(400).json({ message: "Admin already exists" });
@@ -111,20 +130,8 @@ router.post("/change-password", requireAdmin, async (req, res) => {
 });
 
 /* RESET PASSWORD (TEMP) */
-router.post("/reset", async (req, res) => {
-  try {
-    const email = "admin@trippolama.com";
-    const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(404).json({ message: "Admin not found" });
-
-    const hashed = await bcrypt.hash("Chand@12588", 10);
-    admin.password = hashed;
-    await admin.save();
-
-    res.json({ message: "Admin password reset!" });
-  } catch {
-    res.status(500).json({ message: "Reset error" });
-  }
+router.post("/reset", (_req, res) => {
+  return res.status(403).json({ message: "This endpoint is disabled" });
 });
 
 export default router;

@@ -1,7 +1,9 @@
 import express from "express";
 import multer from "multer";
 import cloudinary from "cloudinary";
+import jwt from "jsonwebtoken";
 import Package from "../models/Package.js";
+import Admin from "../models/Admin.js";
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,6 +13,29 @@ cloudinary.v2.config({
 
 const router = express.Router();
 const upload = multer();
+
+const requireAdmin = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ msg: "Admin token required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role === "admin") return next();
+
+    const admin = decoded?.id
+      ? await Admin.findById(decoded.id).select("role")
+      : null;
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({ msg: "Access denied" });
+    }
+
+    next();
+  } catch {
+    return res.status(401).json({ msg: "Invalid admin token" });
+  }
+};
+
+router.use(requireAdmin);
 
 const packageUpload = upload.fields([
   { name: "images", maxCount: 10 },

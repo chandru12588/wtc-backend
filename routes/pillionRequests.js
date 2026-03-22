@@ -4,6 +4,7 @@ import cloudinary from "cloudinary";
 import Package from "../models/Package.js";
 import PillionRideRequest from "../models/PillionRideRequest.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { requireUser } from "../middleware/auth.js";
 
 const router = express.Router();
 const upload = multer();
@@ -177,9 +178,13 @@ router.post("/", requestUpload, async (req, res) => {
   }
 });
 
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", requireUser, async (req, res) => {
   try {
-    const list = await PillionRideRequest.find({ userId: req.params.userId })
+    if (String(req.user.id) !== String(req.params.userId)) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const list = await PillionRideRequest.find({ userId: req.user.id })
       .populate("packageId")
       .populate("assignedRiderId")
       .sort({ createdAt: -1 });
@@ -191,15 +196,12 @@ router.get("/user/:userId", async (req, res) => {
   }
 });
 
-router.delete("/:id/user-delete", async (req, res) => {
+router.delete("/:id/user-delete", requireUser, async (req, res) => {
   try {
-    const { userId } = req.query;
-    if (!userId) return res.status(400).json({ message: "userId is required" });
-
     const request = await PillionRideRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: "Request not found" });
 
-    if (String(request.userId) !== String(userId)) {
+    if (String(request.userId) !== String(req.user.id)) {
       return res.status(403).json({ message: "Not allowed to delete this request" });
     }
 

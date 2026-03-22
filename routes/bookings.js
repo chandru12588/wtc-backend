@@ -3,7 +3,7 @@ import multer from "multer";
 import cloudinary from "cloudinary";
 import Booking from "../models/Booking.js";
 import Package from "../models/Package.js";
-import { requireAdmin } from "../middleware/auth.js";
+import { requireAdmin, requireUser } from "../middleware/auth.js";
 import { generateInvoiceBuffer } from "./invoice.js";
 import { sendEmail } from "../utils/sendEmail.js"; // ✅ BREVO API
 
@@ -46,9 +46,13 @@ cloudinary.v2.config({
 /* ======================================================
    USER — GET PACKAGE BOOKINGS
 ====================================================== */
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", requireUser, async (req, res) => {
   try {
-    const bookings = await Booking.find({ userId: req.params.userId })
+    if (String(req.user.id) !== String(req.params.userId)) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const bookings = await Booking.find({ userId: req.user.id })
       .populate("packageId")
       .sort({ createdAt: -1 });
 
@@ -218,12 +222,16 @@ router.post("/", bookingUpload, async (req, res) => {
 /* ======================================================
    USER / ADMIN — CANCEL PACKAGE BOOKING  ✅ FIX
 ====================================================== */
-router.put("/:id/cancel", async (req, res) => {
+router.put("/:id/cancel", requireUser, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id).populate("packageId");
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (String(booking.userId) !== String(req.user.id)) {
+      return res.status(403).json({ message: "Not allowed to cancel this booking" });
     }
 
     if (new Date() >= new Date(booking.checkIn)) {
@@ -275,19 +283,14 @@ router.put("/:id/cancel", async (req, res) => {
 /* ======================================================
    USER â€” DELETE OWN PACKAGE BOOKING
 ====================================================== */
-router.delete("/:id/user-delete", async (req, res) => {
+router.delete("/:id/user-delete", requireUser, async (req, res) => {
   try {
-    const { userId } = req.query;
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
-
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    if (String(booking.userId) !== String(userId)) {
+    if (String(booking.userId) !== String(req.user.id)) {
       return res.status(403).json({ message: "Not allowed to delete this booking" });
     }
 

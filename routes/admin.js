@@ -27,7 +27,7 @@ function requireAdmin(req, res, next) {
 /* =====================================================
    ADMIN DASHBOARD STATS  (already working – kept same)
 ===================================================== */
-router.get("/stats", async (req, res) => {
+router.get("/stats", requireAdmin, async (req, res) => {
   try {
     const packageBookings = await Booking.find().populate("packageId");
     const hostBookings = await HostBooking.find().populate("listingId");
@@ -136,7 +136,7 @@ router.get("/stats", async (req, res) => {
 /* =====================================================
    ✅ ADMIN GET ALL BOOKINGS (PACKAGE + HOST)
 ===================================================== */
-router.get("/bookings", async (req, res) => {
+router.get("/bookings", requireAdmin, async (req, res) => {
   try {
     const hostBookings = await HostBooking.find().populate("listingId");
     const packageBookings = await Booking.find().populate("packageId");
@@ -182,7 +182,7 @@ router.get("/bookings", async (req, res) => {
 /* =====================================================
    USER MANAGEMENT (Admin viewing users)
 ===================================================== */
-router.get("/users", async (req, res) => {
+router.get("/users", requireAdmin, async (req, res) => {
   try {
     const users = await User.find().select("_id name email phone createdAt");
     res.json(users);
@@ -193,11 +193,11 @@ router.get("/users", async (req, res) => {
 });
 
 /* =====================================================
-   GET USER DETAILS (Including password hash for viewing)
+   GET USER DETAILS
 ===================================================== */
-router.get("/users/:id", async (req, res) => {
+router.get("/users/:id", requireAdmin, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("_id name email phone password createdAt");
+    const user = await User.findById(req.params.id).select("_id name email phone createdAt");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -211,7 +211,7 @@ router.get("/users/:id", async (req, res) => {
 /* =====================================================
    CHANGE USER PASSWORD (Admin Only)
 ===================================================== */
-router.post("/users/:id/change-password", async (req, res) => {
+router.post("/users/:id/change-password", requireAdmin, async (req, res) => {
   try {
     const { newPassword } = req.body;
     if (!newPassword) {

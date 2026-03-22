@@ -8,9 +8,11 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import jwt from "jsonwebtoken";
 
 import passport from "./config/passport.js";
 import { connectDB } from "./config/db.js";
+import Admin from "./models/Admin.js";
 
 import adminRoutes from "./routes/admin.js";
 import adminAuthRoutes from "./routes/adminAuth.js";
@@ -48,10 +50,16 @@ app.use(morgan("dev"));
 
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "https://wtc-chandru.vercel.app",
   "https://trippolama.com",
   "https://www.trippolama.com",
 ];
+
+const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === "true";
+const isTrustedVercelPreview = (origin = "") =>
+  /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(String(origin || ""));
 
 app.use(
   cors({
@@ -59,7 +67,7 @@ app.use(
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
-        origin?.includes("vercel.app")
+        (allowVercelPreviews && isTrustedVercelPreview(origin))
       ) {
         callback(null, true);
       } else {
@@ -128,16 +136,37 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/insights", insightRoutes);
 
-app.use("/api/admin", adminRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
-app.use("/api/admin/users", adminUserRoutes);
-app.use("/api/admin/packages", adminPackageRoutes);
-app.use("/api/admin/host-listings", adminHostListingRoutes);
-app.use("/api/admin/bookings", adminHostBookings);
-app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
-app.use("/api/admin/guides", adminGuideRoutes);
-app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
-app.use("/api/admin/stories", adminStoriesRoutes);
+const requireAdminAccess = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Admin token required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role === "admin") return next();
+
+    const admin = decoded?.id
+      ? await Admin.findById(decoded.id).select("email role")
+      : null;
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({ message: "Admin access denied" });
+    }
+
+    next();
+  } catch {
+    return res.status(401).json({ message: "Invalid admin token" });
+  }
+};
+
+app.use("/api/admin", requireAdminAccess, adminRoutes);
+app.use("/api/admin/users", requireAdminAccess, adminUserRoutes);
+app.use("/api/admin/packages", requireAdminAccess, adminPackageRoutes);
+app.use("/api/admin/host-listings", requireAdminAccess, adminHostListingRoutes);
+app.use("/api/admin/bookings", requireAdminAccess, adminHostBookings);
+app.use("/api/admin/bike-riders", requireAdminAccess, adminBikeRidersRoutes);
+app.use("/api/admin/guides", requireAdminAccess, adminGuideRoutes);
+app.use("/api/admin/pillion-requests", requireAdminAccess, adminPillionRequestRoutes);
+app.use("/api/admin/stories", requireAdminAccess, adminStoriesRoutes);
 
 app.get("/api/packages", async (req, res) => {
   const list = await Package.find().sort({ createdAt: -1 });

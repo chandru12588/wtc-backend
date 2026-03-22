@@ -1,7 +1,9 @@
 import express from "express";
 import User from "../models/User.js";
+import { requireAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
+router.use(requireAdmin);
 
 // GET all users
 router.get("/", async (req, res) => {
