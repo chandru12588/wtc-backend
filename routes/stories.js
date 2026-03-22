@@ -7,6 +7,7 @@ import TravelStory from "../models/TravelStory.js";
 
 const router = express.Router();
 const upload = multer();
+const MAX_STORY_VIDEO_SECONDS = 60;
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -45,9 +46,19 @@ async function uploadMediaFile(file, folder) {
     ? "video"
     : "image";
 
+  if (mediaType === "video" && Number(uploaded.duration || 0) > MAX_STORY_VIDEO_SECONDS) {
+    if (uploaded.public_id) {
+      await cloudinary.v2.uploader.destroy(uploaded.public_id, { resource_type: "video" });
+    }
+    const err = new Error(`Each video must be ${MAX_STORY_VIDEO_SECONDS} seconds or less`);
+    err.statusCode = 400;
+    throw err;
+  }
+
   return {
     url: uploaded.secure_url,
     mediaType,
+    publicId: uploaded.public_id,
   };
 }
 
@@ -88,10 +99,23 @@ router.post("/", upload.array("media", 6), async (req, res) => {
 
     let media = [];
     if (Array.isArray(req.files) && req.files.length) {
-      const uploadedMedia = await Promise.all(
-        req.files.map((file) => uploadMediaFile(file, "trippolama/stories"))
-      );
-      media = uploadedMedia.filter(Boolean);
+      const uploadedMedia = [];
+      try {
+        for (const file of req.files) {
+          const item = await uploadMediaFile(file, "trippolama/stories");
+          if (item) uploadedMedia.push(item);
+        }
+      } catch (uploadErr) {
+        await Promise.all(
+          uploadedMedia.map((item) =>
+            cloudinary.v2.uploader.destroy(item.publicId, {
+              resource_type: item.mediaType === "video" ? "video" : "image",
+            })
+          )
+        );
+        throw uploadErr;
+      }
+      media = uploadedMedia.map(({ url, mediaType }) => ({ url, mediaType }));
     }
 
     if (!content && !media.length) {
@@ -110,7 +134,7 @@ router.post("/", upload.array("media", 6), async (req, res) => {
     res.status(201).json({ message: "Story posted", story });
   } catch (err) {
     console.error("STORY SAVE ERROR:", err);
-    res.status(500).json({ message: "Failed to post story" });
+    res.status(err.statusCode || 500).json({ message: err.message || "Failed to post story" });
   }
 });
 

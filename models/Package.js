@@ -53,6 +53,7 @@ const PackageSchema = new mongoose.Schema(
 
     // Images
     images: [String],
+    videos: [String],
     slug: String,
 
     // Reviews aggregate

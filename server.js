@@ -21,6 +21,7 @@ import adminBikeRidersRoutes from "./routes/adminBikeRiders.js";
 import adminGuideRoutes from "./routes/adminGuides.js";
 import adminPillionRequestRoutes from "./routes/adminPillionRequests.js";
 import adminUserRoutes from "./routes/adminUsers.js";
+import adminStoriesRoutes from "./routes/adminStories.js";
 
 import bookingRoutes from "./routes/bookings.js";
 import userAuthRoutes from "./routes/userAuth.js";
@@ -136,6 +137,7 @@ app.use("/api/admin/bookings", adminHostBookings);
 app.use("/api/admin/bike-riders", adminBikeRidersRoutes);
 app.use("/api/admin/guides", adminGuideRoutes);
 app.use("/api/admin/pillion-requests", adminPillionRequestRoutes);
+app.use("/api/admin/stories", adminStoriesRoutes);
 
 app.get("/api/packages", async (req, res) => {
   const list = await Package.find().sort({ createdAt: -1 });

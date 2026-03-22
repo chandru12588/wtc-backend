@@ -15,6 +15,7 @@ const upload = multer();
 const packageUpload = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "replacementImages", maxCount: 10 },
+  { name: "videos", maxCount: 5 },
 ]);
 
 /* ==============================
@@ -86,22 +87,22 @@ const parsePackagePayload = (body, existing = {}) => ({
 /* ==============================
    HELPER: UPLOAD IMAGES
 ============================== */
-const uploadImages = async (files = []) => {
-  const images = [];
+const uploadAssets = async (files = [], folder = "trippolama/packages") => {
+  const uploadedUrls = [];
 
   for (const file of files) {
     const uploadRes = await new Promise((resolve, reject) => {
       cloudinary.v2.uploader
-        .upload_stream({ folder: "trippolama/packages" }, (err, result) =>
+        .upload_stream({ folder, resource_type: "auto" }, (err, result) =>
           err ? reject(err) : resolve(result)
         )
         .end(file.buffer);
     });
 
-    images.push(uploadRes.secure_url);
+    uploadedUrls.push(uploadRes.secure_url);
   }
 
-  return images;
+  return uploadedUrls;
 };
 
 /* ==============================
@@ -116,11 +117,12 @@ router.post("/", packageUpload, async (req, res) => {
     }
 
     const data = parsePackagePayload(req.body);
-    const images = await uploadImages(req.files?.images || []);
+    const images = await uploadAssets(req.files?.images || [], "trippolama/packages/images");
+    const videos = await uploadAssets(req.files?.videos || [], "trippolama/packages/videos");
 
     data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
-    const pkg = await Package.create({ ...data, images });
+    const pkg = await Package.create({ ...data, images, videos });
 
     console.log("✅ Package created:", pkg._id);
 
@@ -141,9 +143,13 @@ router.put("/:id", packageUpload, async (req, res) => {
 
     const data = parsePackagePayload(req.body, pkg);
     let images = [...pkg.images];
+    let videos = [...(pkg.videos || [])];
 
     if (req.body.oldImages) {
       images = JSON.parse(req.body.oldImages);
+    }
+    if (req.body.oldVideos) {
+      videos = JSON.parse(req.body.oldVideos);
     }
 
     const replacementTargets = req.body.replacementTargets
@@ -160,7 +166,10 @@ router.put("/:id", packageUpload, async (req, res) => {
     }
 
     if (replacementTargets.length) {
-      const uploadedReplacements = await uploadImages(replacementFiles);
+      const uploadedReplacements = await uploadAssets(
+        replacementFiles,
+        "trippolama/packages/images"
+      );
 
       images = images.map((imageUrl) => {
         const idx = replacementTargets.indexOf(imageUrl);
@@ -168,12 +177,14 @@ router.put("/:id", packageUpload, async (req, res) => {
       });
     }
 
-    const newImages = await uploadImages(req.files?.images || []);
+    const newImages = await uploadAssets(req.files?.images || [], "trippolama/packages/images");
     images.push(...newImages);
+    const newVideos = await uploadAssets(req.files?.videos || [], "trippolama/packages/videos");
+    videos.push(...newVideos);
 
     data.slug = data.title.toLowerCase().replace(/\s+/g, "-");
 
-    pkg.set({ ...data, images });
+    pkg.set({ ...data, images, videos });
     await pkg.save();
 
     console.log("✏️ Package updated:", pkg._id);
