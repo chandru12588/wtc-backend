@@ -3,7 +3,7 @@ import multer from "multer";
 const bytes = (mb) => Number(mb || 0) * 1024 * 1024;
 
 export const createMemoryUpload = ({
-  maxFileSizeMB = 30,
+  maxFileSizeMB = 300,
   allowImages = true,
   allowVideos = false,
   allowPdf = false,
