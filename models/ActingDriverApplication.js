@@ -6,13 +6,17 @@ const ActingDriverApplicationSchema = new mongoose.Schema(
     age: { type: Number, required: true },
     phone: { type: String, required: true, trim: true },
     whatsappNumber: { type: String, required: true, trim: true },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    address: { type: String, required: true, trim: true },
     vehicleType: {
       type: String,
       required: true,
-      enum: ["car", "bike"],
+      enum: ["car", "bike", "lorry"],
     },
     experienceYears: { type: Number, default: 0 },
     licenseImageUrl: { type: String, default: "" },
+    livePhotoUrl: { type: String, default: "" },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

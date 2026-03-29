@@ -37,7 +37,10 @@ router.post(
   "/apply",
   publicWriteLimiter,
   uploadLimiter,
-  upload.fields([{ name: "licenseImage", maxCount: 1 }]),
+  upload.fields([
+    { name: "licenseImage", maxCount: 1 },
+    { name: "livePhoto", maxCount: 1 },
+  ]),
   async (req, res) => {
     try {
       const {
@@ -45,6 +48,9 @@ router.post(
         age,
         phone,
         whatsappNumber,
+        city,
+        state,
+        address,
         vehicleType,
         experienceYears,
       } = req.body;
@@ -54,11 +60,14 @@ router.post(
         !age ||
         !phone ||
         !whatsappNumber ||
+        !city ||
+        !state ||
+        !address ||
         !vehicleType
       ) {
         return res.status(400).json({
           message:
-            "Name, age, phone, WhatsApp number and vehicle type are required",
+            "Name, age, phone, WhatsApp number, city, state, address and vehicle type are required",
         });
       }
 
@@ -68,18 +77,38 @@ router.post(
           .json({ message: "Driving licence copy is required" });
       }
 
+      if (!req.files?.livePhoto?.[0]) {
+        return res
+          .status(400)
+          .json({ message: "Live photo is required" });
+      }
+
       const licenseImageUrl = await uploadToCloudinary(
         req.files.licenseImage[0]
       );
+      const livePhotoUrl = await uploadToCloudinary(
+        req.files.livePhoto[0]
+      );
+
+      const normalizedVehicleType = String(vehicleType).toLowerCase().trim();
+      if (!["car", "bike", "lorry"].includes(normalizedVehicleType)) {
+        return res
+          .status(400)
+          .json({ message: "Vehicle type must be car, bike, or lorry" });
+      }
 
       const application = await ActingDriverApplication.create({
         fullName,
         age: Number(age),
         phone,
         whatsappNumber,
-        vehicleType,
+        city,
+        state,
+        address,
+        vehicleType: normalizedVehicleType,
         experienceYears: experienceYears ? Number(experienceYears) : 0,
         licenseImageUrl,
+        livePhotoUrl,
       });
 
       res.status(201).json({
@@ -95,5 +124,54 @@ router.post(
     }
   }
 );
+
+router.get("/approved", async (req, res) => {
+  try {
+    const applications = await ActingDriverApplication.find({
+      status: "approved",
+    })
+      .sort({ approvedAt: -1, createdAt: -1 })
+      .lean();
+
+    const cards = applications.map((app) => ({
+      _id: app._id,
+      title: `${app.fullName} - ${String(app.vehicleType || "").toUpperCase()} Acting Driver`,
+      description: `${app.experienceYears || 0} years experience`,
+      price: 0,
+      location: `${app.city}, ${app.state}`,
+      region: app.state,
+      category: "driver",
+      serviceType: "driver",
+      stayType: "acting-driver",
+      tags: [
+        "acting driver",
+        String(app.vehicleType || "").toLowerCase(),
+        app.city,
+        app.state,
+      ].filter(Boolean),
+      images: [app.livePhotoUrl || app.licenseImageUrl].filter(Boolean),
+      isActingDriverProfile: true,
+      driverProfile: {
+        fullName: app.fullName,
+        phone: app.phone,
+        whatsappNumber: app.whatsappNumber,
+        city: app.city,
+        state: app.state,
+        address: app.address,
+        vehicleType: app.vehicleType,
+        experienceYears: app.experienceYears || 0,
+        livePhotoUrl: app.livePhotoUrl || "",
+        licenseImageUrl: app.licenseImageUrl || "",
+      },
+    }));
+
+    res.json(cards);
+  } catch (err) {
+    console.error("ACTING DRIVER APPROVED LIST ERROR:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch approved acting drivers" });
+  }
+});
 
 export default router;
