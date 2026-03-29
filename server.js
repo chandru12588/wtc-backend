@@ -40,6 +40,7 @@ import pillionRequestRoutes from "./routes/pillionRequests.js";
 import reviewRoutes from "./routes/reviews.js";
 import storyRoutes from "./routes/stories.js";
 import insightRoutes from "./routes/insights.js";
+import aiChatRoutes from "./routes/aiChat.js";
 
 import Package from "./models/Package.js";
 import Listing from "./models/Listing.js";
@@ -142,6 +143,7 @@ app.use("/api/pillion-requests", pillionRequestRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/insights", insightRoutes);
+app.use("/api/ai", aiChatRoutes);
 
 app.use("/api/admin/auth", adminAuthRoutes);
 const requireAdminAccess = async (req, res, next) => {
