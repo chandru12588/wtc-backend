@@ -90,16 +90,20 @@ router.get("/:id", async (req, res) => {
 /* ==============================
    HELPER: PARSE DATA
 ============================== */
-const parsePackagePayload = (body, existing = {}) => ({
-  title: body.title,
-  description: body.description,
-  price: Number(body.price),
-  country: body.country || existing.country || "",
-  location: body.location,
-  region: body.region,
-  category: body.category,
-  serviceType: body.serviceType || existing.serviceType || "general",
-  stayType: body.stayType || existing.stayType || "",
+const parsePackagePayload = (body, existing = {}) => {
+  const serviceType = body.serviceType || existing.serviceType || "general";
+  const isDriver = serviceType === "driver";
+
+  return {
+    title: body.title,
+    description: body.description,
+    price: Number(body.price),
+    country: body.country || existing.country || "",
+    location: body.location || (isDriver ? "Customer Requirement" : existing.location || ""),
+    region: body.region || (isDriver ? "Flexible" : existing.region || ""),
+    category: body.category || (isDriver ? "Acting Driver Service" : existing.category || ""),
+    serviceType,
+    stayType: body.stayType || existing.stayType || "",
   tags: body.tags ? JSON.parse(body.tags) : existing.tags || [],
   guideType: body.guideType || existing.guideType || "",
   guideLanguages: body.guideLanguages
@@ -109,11 +113,16 @@ const parsePackagePayload = (body, existing = {}) => ({
   maxGroupSize: body.maxGroupSize
     ? Number(body.maxGroupSize)
     : existing.maxGroupSize || 0,
-  days: body.days,
-  startDate: new Date(body.startDate),
+    days: body.days || (isDriver ? "As per customer requirement" : existing.days || ""),
+    startDate: body.startDate
+      ? new Date(body.startDate)
+      : isDriver
+      ? new Date("2099-01-01")
+      : existing.startDate,
   endDate: body.endDate ? new Date(body.endDate) : null,
   isHostListing: false,
-});
+  };
+};
 
 /* ==============================
    HELPER: UPLOAD IMAGES
@@ -141,10 +150,16 @@ const uploadAssets = async (files = [], folder = "trippolama/packages") => {
 ============================== */
 router.post("/", uploadLimiter, packageUpload, async (req, res) => {
   try {
-    if (!req.body.startDate || !req.body.stayType || !req.body.category) {
+    const serviceType = req.body.serviceType || "general";
+    const isDriverService = serviceType === "driver";
+
+    if (
+      !req.body.stayType ||
+      (!isDriverService && (!req.body.startDate || !req.body.category))
+    ) {
       return res
         .status(400)
-        .json({ msg: "stayType, category & startDate required" });
+        .json({ msg: "stayType required. category & startDate required for non-driver services" });
     }
 
     const data = parsePackagePayload(req.body);
