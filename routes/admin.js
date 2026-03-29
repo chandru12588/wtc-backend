@@ -4,6 +4,7 @@ import Booking from "../models/Booking.js";
 import HostBooking from "../models/HostBooking.js";
 import User from "../models/User.js";
 import Admin from "../models/Admin.js";
+import AppSetting from "../models/AppSetting.js";
 
 const router = express.Router();
 
@@ -263,6 +264,36 @@ router.post("/profile/update", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("❌ UPDATE ADMIN PROFILE ERROR:", err);
     res.status(500).json({ message: "Failed to update admin profile" });
+  }
+});
+
+router.get("/ai-settings", requireAdmin, async (_req, res) => {
+  try {
+    const setting = await AppSetting.findOne({ key: "ai_chat_enabled" }).lean();
+    res.json({ aiChatEnabled: setting ? setting.value !== false : true });
+  } catch (err) {
+    console.error("GET AI SETTINGS ERROR:", err);
+    res.status(500).json({ message: "Failed to load AI settings" });
+  }
+});
+
+router.put("/ai-settings", requireAdmin, async (req, res) => {
+  try {
+    const { aiChatEnabled } = req.body || {};
+    if (typeof aiChatEnabled !== "boolean") {
+      return res.status(400).json({ message: "aiChatEnabled must be boolean" });
+    }
+
+    await AppSetting.findOneAndUpdate(
+      { key: "ai_chat_enabled" },
+      { key: "ai_chat_enabled", value: aiChatEnabled },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ message: "AI settings updated", aiChatEnabled });
+  } catch (err) {
+    console.error("UPDATE AI SETTINGS ERROR:", err);
+    res.status(500).json({ message: "Failed to update AI settings" });
   }
 });
 
