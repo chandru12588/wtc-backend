@@ -41,6 +41,9 @@ import reviewRoutes from "./routes/reviews.js";
 import storyRoutes from "./routes/stories.js";
 import insightRoutes from "./routes/insights.js";
 import aiChatRoutes from "./routes/aiChat.js";
+import kodaikanalAgentsRoutes from "./routes/kodaikanalAgents.js";
+import adminKodaikanalAgentsRoutes from "./routes/adminKodaikanalAgents.js";
+import { startKodaikanalSyncScheduler } from "./services/kodaikanalAgentSync.js";
 
 import Package from "./models/Package.js";
 import Listing from "./models/Listing.js";
@@ -144,6 +147,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/insights", insightRoutes);
 app.use("/api/ai", aiChatRoutes);
+app.use("/api/kodaikanal-agents", kodaikanalAgentsRoutes);
 
 app.use("/api/admin/auth", adminAuthRoutes);
 const requireAdminAccess = async (req, res, next) => {
@@ -177,6 +181,7 @@ app.use("/api/admin/guides", requireAdminAccess, adminGuideRoutes);
 app.use("/api/admin/acting-drivers", requireAdminAccess, adminActingDriverRoutes);
 app.use("/api/admin/pillion-requests", requireAdminAccess, adminPillionRequestRoutes);
 app.use("/api/admin/stories", requireAdminAccess, adminStoriesRoutes);
+app.use("/api/admin/kodaikanal-agents", requireAdminAccess, adminKodaikanalAgentsRoutes);
 
 app.get("/api/packages", async (req, res) => {
   const list = await Package.find().sort({ createdAt: -1 });
@@ -220,6 +225,7 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 4000;
 
 connectDB().then(() => {
+  startKodaikanalSyncScheduler();
   app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 });
 
