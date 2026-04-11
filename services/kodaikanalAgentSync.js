@@ -34,12 +34,89 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const extractFirstNumber = (value, fallback = 0) => {
+const normalizeNumericString = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  // Convert decimal comma (e.g., 4,6) to decimal dot
+  return text.replace(/(\d),(\d)/g, "$1.$2");
+};
+
+const numberFromUnknown = (value, fallback = Number.NaN) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
-  if (typeof value !== "string") return fallback;
-  const match = value.match(/-?\d+(\.\d+)?/);
-  if (!match) return fallback;
-  const parsed = Number(match[0]);
+  if (typeof value === "string") {
+    const normalized = normalizeNumericString(value);
+    const match = normalized.match(/-?\d+(\.\d+)?/);
+    if (!match) return fallback;
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const num = numberFromUnknown(item, Number.NaN);
+      if (Number.isFinite(num)) return num;
+    }
+    return fallback;
+  }
+  if (value && typeof value === "object") {
+    const preferredKeys = [
+      "rating",
+      "value",
+      "text",
+      "score",
+      "stars",
+      "average",
+      "avg",
+      "count",
+    ];
+    for (const key of preferredKeys) {
+      const num = numberFromUnknown(value[key], Number.NaN);
+      if (Number.isFinite(num)) return num;
+    }
+    for (const nested of Object.values(value)) {
+      const num = numberFromUnknown(nested, Number.NaN);
+      if (Number.isFinite(num)) return num;
+    }
+  }
+  return fallback;
+};
+
+const toBooleanLike = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return ["true", "yes", "y", "1", "verified", "active"].includes(normalized);
+  }
+  return false;
+};
+
+const hasVerifiedHintDeep = (input, depth = 0) => {
+  if (depth > 3 || input == null) return false;
+  if (toBooleanLike(input)) return true;
+
+  if (typeof input === "string") {
+    const text = input.toLowerCase();
+    return text.includes("verified") || text.includes("google verified");
+  }
+
+  if (Array.isArray(input)) {
+    return input.some((v) => hasVerifiedHintDeep(v, depth + 1));
+  }
+
+  if (typeof input === "object") {
+    for (const [key, value] of Object.entries(input)) {
+      if (String(key).toLowerCase().includes("verified") && hasVerifiedHintDeep(value, depth + 1)) {
+        return true;
+      }
+      if (hasVerifiedHintDeep(value, depth + 1)) return true;
+    }
+  }
+
+  return false;
+};
+
+const extractFirstNumber = (value, fallback = 0) => {
+  const parsed = numberFromUnknown(value, Number.NaN);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -59,10 +136,21 @@ const normalizePhone = (value) => String(value || "").replace(/[^\d+]/g, "");
 
 const detectVerified = (item) =>
   Boolean(
-    item?.verified ||
-      item?.isVerified ||
-      item?.googleVerified ||
-      item?.badge === "verified"
+    toBooleanLike(item?.verified) ||
+      toBooleanLike(item?.isVerified) ||
+      toBooleanLike(item?.googleVerified) ||
+      toBooleanLike(item?.is_verified) ||
+      toBooleanLike(item?.profileVerified) ||
+      toBooleanLike(item?.isGoogleVerified) ||
+      toBooleanLike(item?.verificationStatus) ||
+      toBooleanLike(item?.verification_status) ||
+      toBooleanLike(item?.claimed) ||
+      toBooleanLike(item?.isClaimed) ||
+      toBooleanLike(item?.is_claimed) ||
+      toBooleanLike(item?.badge) ||
+      (Array.isArray(item?.badges) &&
+        item.badges.some((badge) => String(badge || "").toLowerCase().includes("verified"))) ||
+      hasVerifiedHintDeep(item)
   );
 
 const detectServices = (item) => {
