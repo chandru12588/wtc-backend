@@ -7,8 +7,15 @@ const KodaikanalQuoteRequestSchema = new mongoose.Schema(
     email: { type: String, trim: true, lowercase: true, default: "" },
     fromCity: {
       type: String,
-      enum: ["Chennai", "Bengaluru", "Trichy"],
+      enum: ["Chennai", "Bengaluru", "Trichy", "Dindigul", "Kodaikanal"],
       required: true,
+      index: true,
+    },
+    destination: { type: String, trim: true, default: "", index: true },
+    destinationState: {
+      type: String,
+      enum: ["Tamil Nadu", "Kerala", ""],
+      default: "",
       index: true,
     },
     travelDate: { type: Date, required: true, index: true },

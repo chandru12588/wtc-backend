@@ -4,11 +4,17 @@ const KodaikanalTravelAgentSchema = new mongoose.Schema(
   {
     city: {
       type: String,
-      enum: ["Chennai", "Bengaluru", "Trichy"],
+      enum: ["Chennai", "Bengaluru", "Trichy", "Dindigul", "Kodaikanal"],
       required: true,
       index: true,
     },
     destination: { type: String, default: "Kodaikanal", index: true },
+    destinationState: {
+      type: String,
+      enum: ["Tamil Nadu", "Kerala", ""],
+      default: "",
+      index: true,
+    },
     dedupeKey: { type: String, required: true, unique: true, index: true },
     apifyItemId: { type: String, trim: true, default: "" },
     sourceUrl: { type: String, trim: true, default: "" },
@@ -33,5 +39,6 @@ const KodaikanalTravelAgentSchema = new mongoose.Schema(
 );
 
 KodaikanalTravelAgentSchema.index({ city: 1, rating: -1 });
+KodaikanalTravelAgentSchema.index({ destinationState: 1, destination: 1 });
 
 export default mongoose.model("KodaikanalTravelAgent", KodaikanalTravelAgentSchema);

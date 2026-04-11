@@ -148,6 +148,7 @@ app.use("/api/stories", storyRoutes);
 app.use("/api/insights", insightRoutes);
 app.use("/api/ai", aiChatRoutes);
 app.use("/api/kodaikanal-agents", kodaikanalAgentsRoutes);
+app.use("/api/travel-agents", kodaikanalAgentsRoutes);
 
 app.use("/api/admin/auth", adminAuthRoutes);
 const requireAdminAccess = async (req, res, next) => {

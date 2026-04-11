@@ -1,11 +1,54 @@
 import axios from "axios";
 import KodaikanalTravelAgent from "../models/KodaikanalTravelAgent.js";
 
-const SUPPORTED_CITIES = ["Chennai", "Bengaluru", "Trichy"];
+const SUPPORTED_CITIES = ["Chennai", "Bengaluru", "Trichy", "Dindigul", "Kodaikanal"];
+const KNOWN_DESTINATIONS = {
+  "Tamil Nadu": [
+    "Kodaikanal",
+    "Ooty",
+    "Yercaud",
+    "Kanyakumari",
+    "Madurai",
+    "Rameswaram",
+    "Coonoor",
+    "Yelagiri",
+    "Kolli Hills",
+    "Chennai",
+    "Mahabalipuram",
+  ],
+  Kerala: [
+    "Munnar",
+    "Wayanad",
+    "Thekkady",
+    "Alleppey",
+    "Kochi",
+    "Kovalam",
+    "Varkala",
+    "Kumarakom",
+    "Athirappilly",
+  ],
+};
 
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const extractFirstNumber = (value, fallback = 0) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  if (typeof value !== "string") return fallback;
+  const match = value.match(/-?\d+(\.\d+)?/);
+  if (!match) return fallback;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const pickFirstNumber = (values = [], fallback = 0) => {
+  for (const value of values) {
+    const num = extractFirstNumber(value, Number.NaN);
+    if (Number.isFinite(num)) return num;
+  }
+  return fallback;
 };
 
 const toStringSafe = (value) => String(value || "").trim();
@@ -38,6 +81,31 @@ const detectServices = (item) => {
   return [];
 };
 
+const detectDestinationAndState = (item) => {
+  const haystack = [
+    item?.destination,
+    item?.place,
+    item?.cityName,
+    item?.location,
+    item?.address,
+    item?.title,
+    item?.name,
+    item?.description,
+  ]
+    .map((v) => toLowerSafe(v))
+    .join(" | ");
+
+  for (const [state, places] of Object.entries(KNOWN_DESTINATIONS)) {
+    for (const place of places) {
+      if (haystack.includes(place.toLowerCase())) {
+        return { destination: place, destinationState: state };
+      }
+    }
+  }
+
+  return { destination: "Kodaikanal", destinationState: "Tamil Nadu" };
+};
+
 const buildSourceUrl = (datasetId, token) =>
   `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&format=json&token=${token}`;
 
@@ -48,11 +116,15 @@ const getSources = () => {
   const datasetChennai = process.env.APIFY_KODAI_CHENNAI_DATASET_ID || "GfffC8NwcC8htV1gv";
   const datasetBengaluru = process.env.APIFY_KODAI_BENGALURU_DATASET_ID || "UO7vu4CwcWREc85eR";
   const datasetTrichy = process.env.APIFY_KODAI_TRICHY_DATASET_ID || "zganzOeYm3EcpvpUb";
+  const datasetDindigul = process.env.APIFY_KODAI_DINDIGUL_DATASET_ID || "gZTdK139ejzoVkQoq";
+  const datasetKodaikanal = process.env.APIFY_KODAI_KODAIKANAL_DATASET_ID || "R4moyMIPaF79YNisp";
 
   return [
     { city: "Chennai", url: buildSourceUrl(datasetChennai, token) },
     { city: "Bengaluru", url: buildSourceUrl(datasetBengaluru, token) },
     { city: "Trichy", url: buildSourceUrl(datasetTrichy, token) },
+    { city: "Dindigul", url: buildSourceUrl(datasetDindigul, token) },
+    { city: "Kodaikanal", url: buildSourceUrl(datasetKodaikanal, token) },
   ];
 };
 
@@ -62,10 +134,35 @@ const normalizeAgent = (item, city, sourceUrl) => {
   const phone = normalizePhone(item?.phone || item?.mobile || item?.contact || "");
   const whatsapp = normalizePhone(item?.whatsapp || item?.whatsappNumber || "");
   const email = toLowerSafe(item?.email || item?.mail || "");
-  const rating = Math.max(0, Math.min(5, toNumber(item?.rating || item?.stars || 0, 0)));
+  const ratingRaw = pickFirstNumber(
+    [
+      item?.rating,
+      item?.stars,
+      item?.avgRating,
+      item?.averageRating,
+      item?.googleRating,
+      item?.ratingText,
+      item?.ratingValue,
+      item?.rawRating,
+    ],
+    0
+  );
+  const rating = Math.max(0, Math.min(5, ratingRaw));
+
+  const reviewRaw = pickFirstNumber(
+    [
+      item?.reviewCount,
+      item?.reviews,
+      item?.totalReviews,
+      item?.ratingsCount,
+      item?.reviewText,
+      item?.userRatingsTotal,
+    ],
+    0
+  );
   const reviewCount = Math.max(
     0,
-    toNumber(item?.reviewCount || item?.reviews || item?.totalReviews || 0, 0)
+    Math.floor(reviewRaw)
   );
 
   const priceFrom = Math.max(
@@ -87,13 +184,15 @@ const normalizeAgent = (item, city, sourceUrl) => {
   const services = detectServices(item);
   const verified = detectVerified(item);
   const apifyItemId = toStringSafe(item?.id || item?._id || item?.itemId || "");
+  const { destination, destinationState } = detectDestinationAndState(item);
 
   const dedupeHint = phone || email || toLowerSafe(`${name}|${agencyName}`);
   const dedupeKey = `${city}|${dedupeHint}`;
 
   return {
     city,
-    destination: "Kodaikanal",
+    destination,
+    destinationState,
     dedupeKey,
     apifyItemId,
     sourceUrl,

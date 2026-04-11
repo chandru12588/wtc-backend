@@ -4,7 +4,7 @@ import KodaikanalTravelAgent from "../models/KodaikanalTravelAgent.js";
 import KodaikanalQuoteRequest from "../models/KodaikanalQuoteRequest.js";
 
 const router = express.Router();
-const ALLOWED_CITIES = ["Chennai", "Bengaluru", "Trichy"];
+const ALLOWED_CITIES = ["Chennai", "Bengaluru", "Trichy", "Dindigul", "Kodaikanal"];
 
 const cleanText = (value) => String(value || "").trim();
 const cleanPhone = (value) => String(value || "").replace(/[^\d+]/g, "");
@@ -17,6 +17,8 @@ router.get("/", async (req, res) => {
   try {
     const {
       city = "",
+      destination = "",
+      state = "",
       search = "",
       minRating = "",
       maxPrice = "",
@@ -26,10 +28,16 @@ router.get("/", async (req, res) => {
       limit = "12",
     } = req.query;
 
-    const filter = { destination: "Kodaikanal", isActive: true };
+    const filter = { isActive: true };
 
     if (city && ALLOWED_CITIES.includes(cleanText(city))) {
       filter.city = cleanText(city);
+    }
+    if (destination) {
+      filter.destination = cleanText(destination);
+    }
+    if (state && ["Tamil Nadu", "Kerala"].includes(cleanText(state))) {
+      filter.destinationState = cleanText(state);
     }
 
     if (search) {
@@ -58,16 +66,21 @@ router.get("/", async (req, res) => {
     if (sort === "price_desc") sortObj = { priceFrom: -1, rating: -1 };
     if (sort === "newest") sortObj = { createdAt: -1 };
 
-    const [items, total, lastSyncDoc] = await Promise.all([
+    const [items, total, lastSyncDoc, availableDestinations, availableStates] = await Promise.all([
       KodaikanalTravelAgent.find(filter)
         .sort(sortObj)
         .skip(skip)
         .limit(limitNum)
         .select("-raw"),
       KodaikanalTravelAgent.countDocuments(filter),
-      KodaikanalTravelAgent.findOne({ destination: "Kodaikanal" })
+      KodaikanalTravelAgent.findOne({})
         .sort({ lastSyncedAt: -1 })
         .select("lastSyncedAt"),
+      KodaikanalTravelAgent.distinct("destination", { isActive: true }),
+      KodaikanalTravelAgent.distinct("destinationState", {
+        isActive: true,
+        destinationState: { $ne: "" },
+      }),
     ]);
 
     res.json({
@@ -79,8 +92,10 @@ router.get("/", async (req, res) => {
         totalPages: Math.max(1, Math.ceil(total / limitNum)),
       },
       meta: {
-        destination: "Kodaikanal",
+        destination: destination || "All",
         allowedCities: ALLOWED_CITIES,
+        availableDestinations: availableDestinations.filter(Boolean).sort(),
+        availableStates: availableStates.filter(Boolean).sort(),
         lastUpdated: lastSyncDoc?.lastSyncedAt || null,
       },
     });
@@ -121,6 +136,8 @@ router.post("/quote-requests", async (req, res) => {
       budget,
       notes,
       agentId,
+      destination,
+      destinationState,
     } = req.body || {};
 
     if (!cleanText(customerName) || !cleanPhone(phone)) {
@@ -143,7 +160,9 @@ router.post("/quote-requests", async (req, res) => {
       if (!mongoose.Types.ObjectId.isValid(agentId)) {
         return res.status(400).json({ message: "Invalid agentId" });
       }
-      agent = await KodaikanalTravelAgent.findById(agentId).select("_id city");
+      agent = await KodaikanalTravelAgent.findById(agentId).select(
+        "_id city destination destinationState"
+      );
       if (!agent) return res.status(404).json({ message: "Selected agent not found" });
     }
 
@@ -152,6 +171,8 @@ router.post("/quote-requests", async (req, res) => {
       phone: cleanPhone(phone),
       email: cleanText(email).toLowerCase(),
       fromCity: cleanText(fromCity),
+      destination: cleanText(destination || agent?.destination || ""),
+      destinationState: cleanText(destinationState || agent?.destinationState || ""),
       travelDate: date,
       travelers: Math.max(1, toNumber(travelers, 1)),
       budget: Math.max(0, toNumber(budget, 0)),
