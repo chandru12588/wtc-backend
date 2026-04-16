@@ -6,16 +6,22 @@ const ALLOWED_CITIES = ["Chennai", "Bengaluru", "Trichy", "Dindigul", "Kodaikana
 
 router.get("/", async (req, res) => {
   try {
-    const { city, limit = 24, search = "" } = req.query;
+    const { city, limit = 24, search = "", minRating = 0 } = req.query;
 
     if (!city || !ALLOWED_CITIES.includes(city)) {
       return res.status(400).json({ message: "Invalid or missing city" });
     }
 
     const filter = { city, isActive: true };
+    const minRatingValue = Number(minRating);
+    if (Number.isFinite(minRatingValue) && minRatingValue > 0) {
+      filter.rating = { $gte: minRatingValue };
+    }
+
     if (search.trim()) {
       filter.$or = [
         { name: { $regex: search.trim(), $options: "i" } },
+        { phone: { $regex: search.trim(), $options: "i" } },
         { services: { $in: [new RegExp(search.trim(), "i")] } },
       ];
     }
