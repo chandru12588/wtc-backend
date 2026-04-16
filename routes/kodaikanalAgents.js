@@ -134,14 +134,9 @@ router.get("/", async (req, res) => {
     const limitNum = Math.min(50, Math.max(1, toNumber(limit, 12)));
     const skip = (pageNum - 1) * limitNum;
 
-    let sortObj = { rating: -1, reviewCount: -1, createdAt: -1 };
-    if (sort === "price_asc") sortObj = { priceFrom: 1, rating: -1 };
-    if (sort === "price_desc") sortObj = { priceFrom: -1, rating: -1 };
-    if (sort === "newest") sortObj = { createdAt: -1 };
-
     const [allCandidates, lastSyncDoc, availableDestinations, availableStates] = await Promise.all([
       KodaikanalTravelAgent.find(filter)
-        .sort(sortObj)
+        .sort({ createdAt: -1 })
         .limit(2000),
       KodaikanalTravelAgent.findOne({})
         .sort({ lastSyncedAt: -1 })
@@ -153,23 +148,42 @@ router.get("/", async (req, res) => {
       }),
     ]);
 
-    let filtered = allCandidates;
-    if (minRating) {
-      const min = toNumber(minRating, 0);
-      filtered = filtered.filter((agent) => inferEffectiveRating(agent) >= min);
-    }
-    if (verified === "true") {
-      filtered = filtered.filter((agent) => inferEffectiveVerified(agent));
-    }
-
-    const total = filtered.length;
-    const items = filtered.slice(skip, skip + limitNum).map((agent) => {
+    const normalized = allCandidates.map((agent) => {
       const obj = agent.toObject();
       obj.rating = inferEffectiveRating(agent);
       obj.verified = inferEffectiveVerified(agent);
       delete obj.raw;
       return obj;
     });
+
+    let filtered = normalized;
+    if (minRating !== "") {
+      const min = toNumber(minRating, 0);
+      if (min > 0) {
+        filtered = filtered.filter((agent) => Number(agent.rating || 0) >= min);
+      }
+    }
+    if (verified === "true") {
+      filtered = filtered.filter((agent) => Boolean(agent.verified));
+    }
+
+    if (sort === "price_asc") {
+      filtered.sort((a, b) => Number(a.priceFrom || 0) - Number(b.priceFrom || 0));
+    } else if (sort === "price_desc") {
+      filtered.sort((a, b) => Number(b.priceFrom || 0) - Number(a.priceFrom || 0));
+    } else if (sort === "newest") {
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      filtered.sort(
+        (a, b) =>
+          Number(b.rating || 0) - Number(a.rating || 0) ||
+          Number(b.reviewCount || 0) - Number(a.reviewCount || 0) ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
+    const total = filtered.length;
+    const items = filtered.slice(skip, skip + limitNum);
 
     res.json({
       items,
