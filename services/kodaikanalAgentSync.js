@@ -188,6 +188,63 @@ const pickFirstNumber = (values = [], fallback = 0) => {
   return fallback;
 };
 
+const extractRatingFromRaw = (raw) => {
+  const candidates = [];
+  const seen = new Set();
+
+  const walk = (node, depth = 0) => {
+    if (depth > 5 || node == null) return;
+
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1);
+      return;
+    }
+
+    if (typeof node === "object") {
+      for (const [key, value] of Object.entries(node)) {
+        const keyText = String(key || "").toLowerCase();
+        const ratingLike =
+          keyText.includes("rating") ||
+          keyText.includes("stars") ||
+          keyText.includes("star") ||
+          keyText.includes("score");
+        const noisy =
+          keyText.includes("count") ||
+          keyText.includes("total") ||
+          keyText.includes("review") ||
+          keyText.includes("vote") ||
+          keyText.includes("user");
+
+        if (ratingLike && !noisy) {
+          const n = numberFromUnknown(value, Number.NaN);
+          if (Number.isFinite(n) && n > 0 && n <= 5) {
+            const k = n.toFixed(2);
+            if (!seen.has(k)) {
+              seen.add(k);
+              candidates.push(n);
+            }
+          }
+        }
+        walk(value, depth + 1);
+      }
+      return;
+    }
+
+    const n = numberFromUnknown(node, Number.NaN);
+    if (Number.isFinite(n) && n > 0 && n <= 5) {
+      const k = n.toFixed(2);
+      if (!seen.has(k)) {
+        seen.add(k);
+        candidates.push(n);
+      }
+    }
+  };
+
+  walk(raw, 0);
+  if (!candidates.length) return 0;
+  return Math.max(...candidates);
+};
+
 const toStringSafe = (value) => String(value || "").trim();
 
 const toLowerSafe = (value) => toStringSafe(value).toLowerCase();
@@ -289,13 +346,22 @@ const normalizeAgent = (item, city, sourceUrl) => {
       item?.avgRating,
       item?.averageRating,
       item?.googleRating,
+      item?.google_rating,
+      item?.aggregateRating,
+      item?.aggregate_rating,
+      item?.overallRating,
+      item?.overall_rating,
       item?.ratingText,
+      item?.rating_text,
       item?.ratingValue,
+      item?.rating_value,
       item?.rawRating,
+      item?.raw_rating,
     ],
     0
   );
-  const rating = Math.max(0, Math.min(5, ratingRaw));
+  const inferredRating = ratingRaw > 0 ? ratingRaw : extractRatingFromRaw(item);
+  const rating = Math.max(0, Math.min(5, inferredRating));
 
   const reviewRaw = pickFirstNumber(
     [

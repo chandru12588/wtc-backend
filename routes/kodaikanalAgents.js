@@ -59,6 +59,62 @@ const numberFromUnknown = (value, fallback = Number.NaN) => {
   }
   return fallback;
 };
+const extractRatingFromRaw = (raw) => {
+  const candidates = [];
+  const seen = new Set();
+
+  const walk = (node, depth = 0) => {
+    if (depth > 5 || node == null) return;
+
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1);
+      return;
+    }
+
+    if (typeof node === "object") {
+      for (const [key, value] of Object.entries(node)) {
+        const keyText = String(key || "").toLowerCase();
+        const ratingLike =
+          keyText.includes("rating") ||
+          keyText.includes("stars") ||
+          keyText.includes("star") ||
+          keyText.includes("score");
+        const noisy =
+          keyText.includes("count") ||
+          keyText.includes("total") ||
+          keyText.includes("review") ||
+          keyText.includes("vote") ||
+          keyText.includes("user");
+
+        if (ratingLike && !noisy) {
+          const n = numberFromUnknown(value, Number.NaN);
+          if (Number.isFinite(n) && n > 0 && n <= 5) {
+            const k = n.toFixed(2);
+            if (!seen.has(k)) {
+              seen.add(k);
+              candidates.push(n);
+            }
+          }
+        }
+        walk(value, depth + 1);
+      }
+      return;
+    }
+
+    const n = numberFromUnknown(node, Number.NaN);
+    if (Number.isFinite(n) && n > 0 && n <= 5) {
+      const k = n.toFixed(2);
+      if (!seen.has(k)) {
+        seen.add(k);
+        candidates.push(n);
+      }
+    }
+  };
+
+  walk(raw, 0);
+  if (!candidates.length) return 0;
+  return Math.max(...candidates);
+};
 const inferEffectiveRating = (agent) => {
   const direct = numberFromUnknown(agent?.rating, Number.NaN);
   if (Number.isFinite(direct) && direct > 0) return Math.max(0, Math.min(5, direct));
@@ -70,12 +126,22 @@ const inferEffectiveRating = (agent) => {
       raw?.avgRating,
       raw?.averageRating,
       raw?.googleRating,
+      raw?.google_rating,
       raw?.aggregateRating,
+      raw?.aggregate_rating,
+      raw?.overallRating,
+      raw?.overall_rating,
       raw?.ratingText,
+      raw?.rating_text,
+      raw?.ratingValue,
+      raw?.rating_value,
     ],
-    0
+    Number.NaN
   );
-  return Math.max(0, Math.min(5, fromRaw));
+  if (Number.isFinite(fromRaw) && fromRaw > 0) {
+    return Math.max(0, Math.min(5, fromRaw));
+  }
+  return Math.max(0, Math.min(5, extractRatingFromRaw(raw)));
 };
 const inferEffectiveVerified = (agent) => {
   if (booleanFromUnknown(agent?.verified)) return true;
