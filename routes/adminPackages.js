@@ -49,6 +49,25 @@ const packageUpload = upload.fields([
   { name: "videos", maxCount: 5 },
 ]);
 
+const KODAI_LOCATION_ALIASES = [
+  "kodaikanal",
+  "kookal",
+  "poombari",
+  "poombri",
+  "poombuhari",
+  "mannavanur",
+  "poondi",
+];
+
+const normalizePackageLocation = (value) => {
+  const raw = String(value || "").trim();
+  const normalized = raw.toLowerCase();
+  if (KODAI_LOCATION_ALIASES.some((alias) => normalized.includes(alias))) {
+    return "Kodaikanal";
+  }
+  return raw;
+};
+
 /* ==============================
    GET ALL PACKAGES (FIXED 🔥)
 ============================== */
@@ -99,7 +118,9 @@ const parsePackagePayload = (body, existing = {}) => {
     description: body.description,
     price: Number(body.price),
     country: body.country || existing.country || "",
-    location: body.location || (isDriver ? "Customer Requirement" : existing.location || ""),
+    location: normalizePackageLocation(
+      body.location || (isDriver ? "Customer Requirement" : existing.location || "")
+    ),
     region: body.region || (isDriver ? "Flexible" : existing.region || ""),
     category: body.category || (isDriver ? "Acting Driver Service" : existing.category || ""),
     serviceType,
