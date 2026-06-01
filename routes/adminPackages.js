@@ -2,6 +2,7 @@ import express from "express";
 import cloudinary from "cloudinary";
 import jwt from "jsonwebtoken";
 import Package from "../models/Package.js";
+import Booking from "../models/Booking.js";
 import Admin from "../models/Admin.js";
 import { createMemoryUpload } from "../middleware/upload.js";
 import { uploadLimiter } from "../middleware/rateLimiters.js";
@@ -107,6 +108,53 @@ router.get("/:id", async (req, res) => {
 });
 
 /* ==============================
+   PACKAGE CALENDAR SUMMARY
+============================== */
+router.get("/:id/calendar-summary", async (req, res) => {
+  try {
+    const pkg = await Package.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ msg: "Package not found" });
+
+    const bookings = await Booking.find({
+      packageId: pkg._id,
+      status: { $in: ["pending", "accepted"] },
+    }).select("checkIn checkOut status");
+
+    const toKey = (value) => new Date(value).toISOString().split("T")[0];
+    const bookedDates = [];
+
+    bookings.forEach((item) => {
+      const from = new Date(item.checkIn);
+      const to = new Date(item.checkOut || item.checkIn);
+      from.setHours(0, 0, 0, 0);
+      to.setHours(0, 0, 0, 0);
+      for (let cursor = new Date(from); cursor <= to; cursor.setDate(cursor.getDate() + 1)) {
+        bookedDates.push(toKey(cursor));
+      }
+    });
+
+    const availableDates = [pkg.startDate, ...(pkg.availableDates || [])]
+      .filter(Boolean)
+      .map((value) => toKey(value));
+
+    const blockedDates = (pkg.blockedDates || []).map((value) => toKey(value));
+
+    res.json({
+      packageId: pkg._id,
+      title: pkg.title,
+      serviceType: pkg.serviceType || "general",
+      startDate: pkg.startDate,
+      availableDates: [...new Set(availableDates)],
+      blockedDates: [...new Set(blockedDates)],
+      bookedDates: [...new Set(bookedDates)],
+    });
+  } catch (err) {
+    console.error("CALENDAR SUMMARY ERROR:", err);
+    res.status(500).json({ msg: "Failed to load calendar summary" });
+  }
+});
+
+/* ==============================
    HELPER: PARSE DATA
 ============================== */
 const parsePackagePayload = (body, existing = {}) => {
@@ -141,6 +189,12 @@ const parsePackagePayload = (body, existing = {}) => {
       ? new Date("2099-01-01")
       : existing.startDate,
   endDate: body.endDate ? new Date(body.endDate) : null,
+  availableDates: body.availableDates
+    ? JSON.parse(body.availableDates).map((d) => new Date(d))
+    : existing.availableDates || [],
+  blockedDates: body.blockedDates
+    ? JSON.parse(body.blockedDates).map((d) => new Date(d))
+    : existing.blockedDates || [],
   isHostListing: false,
   };
 };

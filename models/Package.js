@@ -50,6 +50,7 @@ const PackageSchema = new mongoose.Schema(
 
     // 🔮 For multiple batches in future
     availableDates: [{ type: Date }],
+    blockedDates: [{ type: Date }],
 
     // Images
     images: [String],

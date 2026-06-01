@@ -42,6 +42,12 @@ const notifyAdmin = async ({ subject, html }) => {
   await sendEmail({ to: adminEmail, subject, html });
 };
 
+const toDayStart = (value) => {
+  const day = new Date(value);
+  day.setHours(0, 0, 0, 0);
+  return day;
+};
+
 /* ================= CLOUDINARY ================= */
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -125,6 +131,45 @@ router.post("/", publicWriteLimiter, uploadLimiter, bookingUpload, async (req, r
 
     const pkg = await Package.findById(packageId);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut || checkIn);
+    if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
+      return res.status(400).json({ message: "Invalid check-in/check-out date" });
+    }
+
+    const requestedFrom = toDayStart(checkInDate);
+    const requestedTo = toDayStart(checkOutDate);
+    if (requestedTo < requestedFrom) {
+      return res.status(400).json({ message: "Check-out cannot be before check-in" });
+    }
+
+    const today = toDayStart(new Date());
+    if (requestedFrom < today) {
+      return res.status(400).json({ message: "Past dates are not available for booking" });
+    }
+
+    const manuallyBlocked = (pkg.blockedDates || [])
+      .map((d) => toDayStart(d))
+      .some((d) => d >= requestedFrom && d <= requestedTo);
+    if (manuallyBlocked) {
+      return res.status(409).json({
+        message: "Selected date is blocked for this package. Please choose another date.",
+      });
+    }
+
+    const overlap = await Booking.findOne({
+      packageId,
+      status: { $in: ["pending", "accepted"] },
+      checkIn: { $lte: requestedTo },
+      checkOut: { $gte: requestedFrom },
+    }).select("_id");
+
+    if (overlap) {
+      return res.status(409).json({
+        message: "Selected date is already booked. Please choose another date.",
+      });
+    }
 
     const normalizedServiceType = serviceType || pkg.serviceType || "general";
     const normalizedDays = Math.max(Number(serviceDays || 1), 1);
@@ -283,6 +328,35 @@ router.put("/:id/cancel", requireUser, async (req, res) => {
   } catch (err) {
     console.error("PACKAGE CANCEL ERROR:", err);
     res.status(500).json({ message: "Cancel failed" });
+  }
+});
+
+/* ======================================================
+   PUBLIC - BLOCKED DATES FOR A PACKAGE
+====================================================== */
+router.get("/package/:packageId/blocked-dates", async (req, res) => {
+  try {
+    const pkg = await Package.findById(req.params.packageId).select("blockedDates");
+    const bookings = await Booking.find({
+      packageId: req.params.packageId,
+      status: { $in: ["pending", "accepted"] },
+    }).select("checkIn checkOut");
+
+    const blockedDates = (pkg?.blockedDates || []).map((d) =>
+      new Date(d).toISOString().split("T")[0]
+    );
+    bookings.forEach((item) => {
+      const from = toDayStart(item.checkIn);
+      const to = toDayStart(item.checkOut || item.checkIn);
+      for (let cursor = new Date(from); cursor <= to; cursor.setDate(cursor.getDate() + 1)) {
+        blockedDates.push(new Date(cursor).toISOString().split("T")[0]);
+      }
+    });
+
+    res.json({ blockedDates: [...new Set(blockedDates)] });
+  } catch (err) {
+    console.error("BLOCKED DATES ERROR:", err);
+    res.status(500).json({ message: "Failed to load blocked dates" });
   }
 });
 

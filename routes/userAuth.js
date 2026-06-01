@@ -23,6 +23,27 @@ function createToken(user) {
   );
 }
 
+function buildReferralCode(seed = "TRIP") {
+  const base = String(seed || "TRIP")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 5) || "TRIP";
+  const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${base}${suffix}`;
+}
+
+async function ensureReferralCode(user) {
+  if (user?.referralCode) return user.referralCode;
+  let code = buildReferralCode(user?.name || user?.email || "TRIP");
+  let exists = await User.findOne({ referralCode: code }).select("_id");
+  while (exists) {
+    code = buildReferralCode(user?.name || user?.email || "TRIP");
+    exists = await User.findOne({ referralCode: code }).select("_id");
+  }
+  user.referralCode = code;
+  return code;
+}
+
 function decodeUser(req) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) return null;
@@ -54,7 +75,7 @@ router.post("/send-otp", otpSendLimiter, async (req, res) => {
       return res.status(400).json({ message: "Request body missing" });
     }
 
-    const { name, email, phone, dob } = req.body;
+    const { name, email, phone, dob, referralCode } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: "Email required" });
@@ -71,10 +92,28 @@ router.post("/send-otp", otpSendLimiter, async (req, res) => {
     if (!user) {
       const fallbackName = (name && name.trim()) || email.split("@")[0] || "User";
       user = await User.create({ name: fallbackName, email, phone, dob });
+      await ensureReferralCode(user);
+      if (referralCode) {
+        const inviter = await User.findOne({
+          referralCode: String(referralCode).trim().toUpperCase(),
+        }).select("_id");
+        if (inviter && String(inviter._id) !== String(user._id)) {
+          user.referredBy = inviter._id;
+        }
+      }
     } else {
       if (name && name.trim()) user.name = name.trim();
       if (typeof phone !== "undefined") user.phone = phone;
       if (dob) user.dob = dob;
+      await ensureReferralCode(user);
+      if (!user.referredBy && referralCode) {
+        const inviter = await User.findOne({
+          referralCode: String(referralCode).trim().toUpperCase(),
+        }).select("_id");
+        if (inviter && String(inviter._id) !== String(user._id)) {
+          user.referredBy = inviter._id;
+        }
+      }
     }
 
     user.otpCode = otp;
@@ -130,7 +169,16 @@ router.post("/verify-otp", otpVerifyLimiter, async (req, res) => {
 
     user.otpCode = undefined;
     user.otpExpires = undefined;
+    await ensureReferralCode(user);
     await user.save();
+
+    if (user.referredBy && !user.referralAttributed) {
+      await User.findByIdAndUpdate(user.referredBy, {
+        $inc: { referralJoinedCount: 1 },
+      });
+      user.referralAttributed = true;
+      await user.save();
+    }
 
     const token = createToken(user);
 
@@ -142,6 +190,7 @@ router.post("/verify-otp", otpVerifyLimiter, async (req, res) => {
         email: user.email,
         phone: user.phone || "",
         dob: user.dob || null,
+        referralCode: user.referralCode || "",
       },
     });
   } catch (err) {
@@ -164,7 +213,7 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ message: "Session expired. Please login again" });
     }
 
-    const fullUser = await User.findById(user._id).select("name email phone dob favorites");
+    const fullUser = await User.findById(user._id).select("name email phone dob favorites referralCode");
     const refreshedToken =
       String(user._id) !== String(decoded.id) ? createToken(user) : null;
 
@@ -180,7 +229,7 @@ router.get("/me", async (req, res) => {
 
 router.post("/register", authLoginLimiter, async (req, res) => {
   try {
-    const { name, email, phone, dob, password } = req.body;
+    const { name, email, phone, dob, password, referralCode } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res
@@ -203,6 +252,20 @@ router.post("/register", authLoginLimiter, async (req, res) => {
       dob,
       password: hashedPassword,
     });
+    await ensureReferralCode(user);
+    if (referralCode) {
+      const inviter = await User.findOne({
+        referralCode: String(referralCode).trim().toUpperCase(),
+      }).select("_id");
+      if (inviter && String(inviter._id) !== String(user._id)) {
+        user.referredBy = inviter._id;
+        user.referralAttributed = true;
+        await User.findByIdAndUpdate(inviter._id, {
+          $inc: { referralJoinedCount: 1 },
+        });
+      }
+    }
+    await user.save();
 
     const token = createToken(user);
 
@@ -215,6 +278,7 @@ router.post("/register", authLoginLimiter, async (req, res) => {
         email: user.email,
         phone: user.phone || "",
         dob: user.dob || null,
+        referralCode: user.referralCode || "",
       },
     });
   } catch (err) {
@@ -259,6 +323,7 @@ router.post("/login", authLoginLimiter, async (req, res) => {
         email: user.email,
         phone: user.phone || "",
         dob: user.dob || null,
+        referralCode: user.referralCode || "",
       },
     });
   } catch (err) {
@@ -380,7 +445,7 @@ router.put("/profile", async (req, res) => {
     existingUser.dob = dob || null;
     await existingUser.save();
 
-    const user = await User.findById(existingUser._id).select("name email phone dob favorites");
+    const user = await User.findById(existingUser._id).select("name email phone dob favorites referralCode");
 
     const refreshedToken =
       String(existingUser._id) !== String(decoded.id) ? createToken(existingUser) : null;
@@ -394,11 +459,45 @@ router.put("/profile", async (req, res) => {
         email: user.email,
         phone: user.phone || "",
         dob: user.dob || null,
+        referralCode: user.referralCode || "",
       },
     });
   } catch (err) {
     console.error("PROFILE UPDATE ERROR:", err);
     res.status(500).json({ message: "Failed to update profile" });
+  }
+});
+
+router.get("/referral/summary", async (req, res) => {
+  try {
+    const decoded = decodeUser(req);
+    if (!decoded?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await findUserFromDecoded(decoded);
+    if (!user) return res.status(401).json({ message: "Session expired. Please login again" });
+
+    await ensureReferralCode(user);
+    await user.save();
+
+    const joinedUsers = await User.find({ referredBy: user._id })
+      .select("name createdAt email")
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    res.json({
+      referralCode: user.referralCode,
+      referralJoinedCount: joinedUsers.length,
+      joinedUsers: joinedUsers.map((item) => ({
+        name: item.name,
+        email: item.email,
+        joinedAt: item.createdAt,
+      })),
+      couponCode: "FRIEND10",
+      couponNote: "Apply FRIEND10 for eligible referral discount campaigns.",
+    });
+  } catch (err) {
+    console.error("REFERRAL SUMMARY ERROR:", err);
+    res.status(500).json({ message: "Failed to load referral summary" });
   }
 });
 

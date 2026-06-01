@@ -191,13 +191,69 @@ app.use("/api/admin/roadside-assistance", requireAdminAccess, adminRoadsideAssis
 
 app.get("/api/packages", async (req, res) => {
   const list = await Package.find().sort({ createdAt: -1 });
-  res.json(list);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const normalized = list
+    .map((pkgDoc) => {
+      const pkg = pkgDoc.toObject();
+      const isGeneral = (pkg.serviceType || "general") === "general";
+
+      if (!isGeneral) return pkg;
+
+      const candidateDates = [pkg.startDate, ...(pkg.availableDates || [])]
+        .filter(Boolean)
+        .map((value) => new Date(value))
+        .filter((value) => !Number.isNaN(value.getTime()))
+        .filter((value) => {
+          const day = new Date(value);
+          day.setHours(0, 0, 0, 0);
+          return day >= today;
+        })
+        .sort((a, b) => a - b);
+
+      if (!candidateDates.length) return null;
+
+      return {
+        ...pkg,
+        // Expose the next upcoming date so frontend never shows stale past dates.
+        startDate: candidateDates[0],
+      };
+    })
+    .filter(Boolean);
+
+  res.json(normalized);
 });
 
 app.get("/api/packages/:id", async (req, res) => {
   try {
-    const pkg = await Package.findById(req.params.id);
-    if (!pkg) return res.status(404).json({ msg: "Package not found" });
+    const pkgDoc = await Package.findById(req.params.id);
+    if (!pkgDoc) return res.status(404).json({ msg: "Package not found" });
+
+    const pkg = pkgDoc.toObject();
+    const isGeneral = (pkg.serviceType || "general") === "general";
+    if (isGeneral) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const candidateDates = [pkg.startDate, ...(pkg.availableDates || [])]
+        .filter(Boolean)
+        .map((value) => new Date(value))
+        .filter((value) => !Number.isNaN(value.getTime()))
+        .filter((value) => {
+          const day = new Date(value);
+          day.setHours(0, 0, 0, 0);
+          return day >= today;
+        })
+        .sort((a, b) => a - b);
+
+      if (!candidateDates.length) {
+        return res.status(410).json({ msg: "Package date is no longer available" });
+      }
+
+      pkg.startDate = candidateDates[0];
+    }
     res.json(pkg);
   } catch {
     res.status(500).json({ msg: "Error fetching package" });
