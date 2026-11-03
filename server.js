@@ -189,39 +189,47 @@ app.use("/api/admin/stories", requireAdminAccess, adminStoriesRoutes);
 app.use("/api/admin/kodaikanal-agents", requireAdminAccess, adminKodaikanalAgentsRoutes);
 app.use("/api/admin/roadside-assistance", requireAdminAccess, adminRoadsideAssistanceRoutes);
 
+const getUpcomingPackageDates = (pkg, today = new Date()) => {
+  const todayStart = new Date(today);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const futureDates = [pkg.startDate, ...(pkg.availableDates || [])]
+    .filter(Boolean)
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .filter((value) => {
+      const day = new Date(value);
+      day.setHours(0, 0, 0, 0);
+      return day >= todayStart;
+    })
+    .sort((a, b) => a - b);
+
+  if (futureDates.length) return { dates: futureDates, rolledForward: false };
+  const fallbackDate = new Date(todayStart);
+  fallbackDate.setDate(fallbackDate.getDate() + 1);
+  return { dates: [fallbackDate], rolledForward: true };
+};
+
 app.get("/api/packages", async (req, res) => {
   const list = await Package.find().sort({ createdAt: -1 });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const normalized = list
-    .map((pkgDoc) => {
+  const normalized = await Promise.all(list.map(async (pkgDoc) => {
       const pkg = pkgDoc.toObject();
       const isGeneral = (pkg.serviceType || "general") === "general";
 
       if (!isGeneral) return pkg;
 
-      const candidateDates = [pkg.startDate, ...(pkg.availableDates || [])]
-        .filter(Boolean)
-        .map((value) => new Date(value))
-        .filter((value) => !Number.isNaN(value.getTime()))
-        .filter((value) => {
-          const day = new Date(value);
-          day.setHours(0, 0, 0, 0);
-          return day >= today;
-        })
-        .sort((a, b) => a - b);
-
-      if (!candidateDates.length) return null;
+      const { dates: candidateDates, rolledForward } = getUpcomingPackageDates(pkg);
+      if (rolledForward) {
+        pkgDoc.startDate = candidateDates[0];
+        await pkgDoc.save();
+      }
 
       return {
         ...pkg,
-        // Expose the next upcoming date so frontend never shows stale past dates.
         startDate: candidateDates[0],
       };
-    })
-    .filter(Boolean);
+    }));
 
   res.json(normalized);
 });
@@ -234,22 +242,10 @@ app.get("/api/packages/:id", async (req, res) => {
     const pkg = pkgDoc.toObject();
     const isGeneral = (pkg.serviceType || "general") === "general";
     if (isGeneral) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const candidateDates = [pkg.startDate, ...(pkg.availableDates || [])]
-        .filter(Boolean)
-        .map((value) => new Date(value))
-        .filter((value) => !Number.isNaN(value.getTime()))
-        .filter((value) => {
-          const day = new Date(value);
-          day.setHours(0, 0, 0, 0);
-          return day >= today;
-        })
-        .sort((a, b) => a - b);
-
-      if (!candidateDates.length) {
-        return res.status(410).json({ msg: "Package date is no longer available" });
+      const { dates: candidateDates, rolledForward } = getUpcomingPackageDates(pkg);
+      if (rolledForward) {
+        pkgDoc.startDate = candidateDates[0];
+        await pkgDoc.save();
       }
 
       pkg.startDate = candidateDates[0];
